@@ -1,0 +1,139 @@
+classDiagram
+
+    class VideoProcessor {
+        -ytdlp_client
+        +__init__(config: dict)
+        +validate_url(url: str) -> bool
+        +extract_video_metadata(url: str) -> dict
+        +extract_audio(url: str, output_path: str) -> str
+        +get_video_duration(url: str) -> int
+        +check_language(url: str) -> str
+    }
+
+    class TranscriptionService {
+        -markitdown_client
+        +__init__(config: dict)
+        +transcribe_audio(audio_path: str) -> dict
+        +extract_timestamps(transcript: dict) -> list
+        +convert_to_markdown(transcript: dict) -> str
+        +save_transcript(content: str, path: str) -> bool
+        +detect_speakers(transcript: dict) -> dict
+    }
+
+    class TranslationService {
+        -openai_client
+        -prompt_templates: dict
+        +__init__(config: dict)
+        +translate_text(text: str, source_lang: str, target_lang: str) -> str
+        +translate_with_timestamps(transcript_md: str) -> str
+        +format_translation(translated_text: str) -> str
+        +estimate_translation_time(text_length: int) -> int
+    }
+
+    class DocumentGenerator {
+        +__init__(config: dict)
+        +generate_pdf(content: str, path: str) -> str
+        +generate_markdown(content: str, path: str) -> str
+        +apply_styling(content: str, style_type: str) -> str
+        +add_metadata(document: str, metadata: dict) -> str
+        +create_preview(content: str) -> str
+    }
+
+    class JobManager {
+        -redis_client
+        -jobs: dict
+        +__init__(config: dict)
+        +create_job(url: str) -> str
+        +get_job_status(job_id: str) -> dict
+        +update_job_status(job_id: str, status: dict) -> bool
+        +cancel_job(job_id: str) -> bool
+        +clean_up_job(job_id: str) -> bool
+        +estimate_completion_time(job: dict) -> int
+    }
+
+    class ProcessingQueue {
+        -redis_client
+        +__init__(config: dict)
+        +enqueue_job(job_id: str, data: dict) -> bool
+        +process_next_job() -> dict
+        +get_queue_length() -> int
+        +remove_job_from_queue(job_id: str) -> bool
+    }
+
+    class UserStorage {
+        -storage_path: str
+        +__init__(config: dict)
+        +save_file(content: bytes, file_path: str) -> str
+        +get_file(file_path: str) -> bytes
+        +delete_file(file_path: str) -> bool
+        +get_file_url(file_path: str) -> str
+        +list_user_files(user_id: str) -> list
+    }
+
+    class ApiController {
+        -job_manager: JobManager
+        -storage: UserStorage
+        +__init__(job_manager: JobManager, storage: UserStorage)
+        +submit_url(url: str) -> dict
+        +get_job_status(job_id: str) -> dict
+        +cancel_job(job_id: str) -> dict
+        +get_file(job_id: str, file_type: str) -> bytes
+        +list_recent_jobs() -> list
+    }
+
+    class WebSocketManager {
+        -connections: dict
+        +__init__()
+        +register_client(client_id: str, websocket) -> bool
+        +remove_client(client_id: str) -> bool
+        +send_update(client_id: str, data: dict) -> bool
+        +broadcast_update(data: dict) -> bool
+    }
+
+    class Config {
+        +API_KEYS: dict
+        +STORAGE_PATH: str
+        +MAX_VIDEO_DURATION: int
+        +SUPPORTED_LANGUAGES: list
+        +TRANSLATION_QUALITY_OPTIONS: dict
+        +load_from_env() -> Config
+        +validate() -> bool
+    }
+
+    class ProcessingPipeline {
+        -video_processor: VideoProcessor
+        -transcription_service: TranscriptionService
+        -translation_service: TranslationService
+        -document_generator: DocumentGenerator
+        -job_manager: JobManager
+        -websocket_manager: WebSocketManager
+        -storage: UserStorage
+        +__init__(config: Config)
+        +process_job(job_id: str) -> bool
+        +update_progress(job_id: str, stage: str, progress: float) -> bool
+        +handle_error(job_id: str, error: Exception) -> bool
+    }
+
+    class FrontendInterface {
+        +submit_url(url: str) -> dict
+        +check_status(job_id: str) -> dict
+        +download_file(job_id: str, file_type: str) -> bytes
+        +cancel_processing(job_id: str) -> bool
+        +connect_websocket(job_id: str) -> WebSocket
+    }
+    
+    %% Relationships
+    ProcessingPipeline --> VideoProcessor
+    ProcessingPipeline --> TranscriptionService
+    ProcessingPipeline --> TranslationService
+    ProcessingPipeline --> DocumentGenerator
+    ProcessingPipeline --> JobManager
+    ProcessingPipeline --> WebSocketManager
+    ProcessingPipeline --> UserStorage
+    
+    ApiController --> JobManager
+    ApiController --> UserStorage
+    
+    JobManager --> ProcessingQueue
+    
+    FrontendInterface ..> ApiController: uses

@@ -1,0 +1,94 @@
+sequenceDiagram
+    participant User
+    participant FrontendUI as Frontend UI
+    participant ApiCtrl as API Controller
+    participant JobMgr as Job Manager
+    participant Queue as Processing Queue
+    participant Pipeline as Processing Pipeline
+    participant VidProc as Video Processor
+    participant TransServ as Transcription Service
+    participant TranslServ as Translation Service
+    participant DocGen as Document Generator
+    participant Storage as User Storage
+    participant WSManager as WebSocket Manager
+
+    %% URL Submission Flow
+    User->>+FrontendUI: Paste YouTube URL
+    FrontendUI->>+ApiCtrl: submit_url(url)
+    ApiCtrl->>+VidProc: validate_url(url)
+    VidProc-->>-ApiCtrl: validation_result
+    alt URL is valid
+        ApiCtrl->>+VidProc: extract_video_metadata(url)
+        VidProc-->>-ApiCtrl: metadata
+        ApiCtrl->>+JobMgr: create_job(url, metadata)
+        JobMgr-->>-ApiCtrl: job_id
+        ApiCtrl->>+Queue: enqueue_job(job_id, {url, metadata})
+        Queue-->>-ApiCtrl: success
+        ApiCtrl-->>-FrontendUI: {job_id, initial_status}
+        FrontendUI->>+WSManager: register_client(job_id)
+        WSManager-->>-FrontendUI: connection_established
+    else URL is invalid
+        ApiCtrl-->>-FrontendUI: error_message
+    end
+    
+    %% Job Processing Flow
+    Queue->>+Pipeline: process_next_job()
+    Pipeline->>+JobMgr: get_job_status(job_id)
+    JobMgr-->>-Pipeline: job_details
+    
+    %% Video Processing Stage
+    Pipeline->>JobMgr: update_job_status(job_id, "extracting_audio")
+    JobMgr->>WSManager: send_update(job_id, "extracting_audio")
+    WSManager->>FrontendUI: status_update
+    Pipeline->>+VidProc: extract_audio(url, output_path)
+    VidProc-->>-Pipeline: audio_path
+    
+    %% Transcription Stage
+    Pipeline->>JobMgr: update_job_status(job_id, "transcribing")
+    JobMgr->>WSManager: send_update(job_id, "transcribing")
+    WSManager->>FrontendUI: status_update
+    Pipeline->>+TransServ: transcribe_audio(audio_path)
+    TransServ-->>-Pipeline: arabic_transcript
+    Pipeline->>+TransServ: convert_to_markdown(transcript)
+    TransServ-->>-Pipeline: arabic_transcript_md
+    Pipeline->>Storage: save_file(arabic_transcript_md, "arabic_transcript.md")
+    
+    %% Translation Stage
+    Pipeline->>JobMgr: update_job_status(job_id, "translating")
+    JobMgr->>WSManager: send_update(job_id, "translating")
+    WSManager->>FrontendUI: status_update
+    Pipeline->>+TranslServ: translate_with_timestamps(arabic_transcript_md)
+    TranslServ-->>-Pipeline: english_transcript_md
+    Pipeline->>Storage: save_file(english_transcript_md, "english_transcript.md")
+    
+    %% Document Generation Stage
+    Pipeline->>JobMgr: update_job_status(job_id, "generating_documents")
+    JobMgr->>WSManager: send_update(job_id, "generating_documents")
+    WSManager->>FrontendUI: status_update
+    Pipeline->>+DocGen: generate_pdf(english_transcript_md, output_path)
+    DocGen-->>-Pipeline: pdf_path
+    Pipeline->>Storage: save_file(pdf_content, "transcript.pdf")
+    Pipeline->>Storage: save_file(english_transcript_md, "transcript.md")
+    
+    %% Completion
+    Pipeline->>JobMgr: update_job_status(job_id, "completed")
+    JobMgr->>WSManager: send_update(job_id, "completed", file_urls)
+    WSManager->>FrontendUI: completion_update
+    Pipeline-->>-Queue: job_completed
+    
+    %% User Retrieves Results
+    FrontendUI->>User: Show completion notification
+    User->>+FrontendUI: Request download PDF
+    FrontendUI->>+ApiCtrl: get_file(job_id, "pdf")
+    ApiCtrl->>+Storage: get_file("transcript.pdf")
+    Storage-->>-ApiCtrl: pdf_content
+    ApiCtrl-->>-FrontendUI: pdf_content
+    FrontendUI-->>-User: Download PDF
+    
+    %% Error Handling Flow (Alternative Path)
+    alt Error during processing
+        Pipeline->>JobMgr: handle_error(job_id, error)
+        JobMgr->>WSManager: send_update(job_id, "error", error_details)
+        WSManager->>FrontendUI: error_update
+        FrontendUI->>User: Display error message
+    end

@@ -1,0 +1,101 @@
+{
+  "timeline_index": 37,
+  "planner": {
+    "Team Leader": {
+      "1": {
+        "task_id": "1",
+        "dependent_task_ids": [],
+        "instruction": "Create a PRD for a full-stack web application that allows users to paste an Arabic YouTube video link, transcribe and convert it using Microsoft's MarkItDown library, translate it to English, and output a timestamped PDF and searchable MD file.",
+        "task_type": "general",
+        "code": "",
+        "result": "",
+        "is_success": false,
+        "is_finished": true,
+        "assignee": "Emma",
+        "start_at": 1747345901.2654433,
+        "end_at": 1747346341.5249903
+      },
+      "current_task_id": "3",
+      "2": {
+        "task_id": "2",
+        "dependent_task_ids": [
+          "1"
+        ],
+        "instruction": "Design the architecture for the Arabic YouTube video transcription and translation application based on the PRD.",
+        "task_type": "general",
+        "code": "",
+        "result": "",
+        "is_success": false,
+        "is_finished": true,
+        "assignee": "Bob",
+        "start_at": 1747346341.5250187,
+        "end_at": 1747346471.9426248
+      },
+      "3": {
+        "task_id": "3",
+        "dependent_task_ids": [
+          "2"
+        ],
+        "instruction": "Develop the full-stack web application for Arabic YouTube video transcription and translation based on the system design using React, JavaScript, and Tailwind CSS.",
+        "task_type": "general",
+        "code": "",
+        "result": "",
+        "is_success": false,
+        "is_finished": false,
+        "assignee": "Alex",
+        "start_at": 1747346471.9426486
+      }
+    }
+  },
+  "gallery_last_file": {},
+  "timeline_status": {
+    "1": 1,
+    "2": 1,
+    "3": 1,
+    "4": 1,
+    "5": 1,
+    "6": 1,
+    "7": 1,
+    "8": 1,
+    "9": 1,
+    "10": 1,
+    "11": 1,
+    "12": 1,
+    "13": 1,
+    "14": 1,
+    "15": 1,
+    "16": 1,
+    "17": 1,
+    "18": 1,
+    "19": 1,
+    "20": 1,
+    "22": 1,
+    "23": 1,
+    "24": 1,
+    "25": 1,
+    "26": 1,
+    "27": 0,
+    "29": 1,
+    "30": 1,
+    "31": 1,
+    "32": 1,
+    "33": 1,
+    "34": 1,
+    "35": 1,
+    "36": 0,
+    "37": 1
+  },
+  "preview_servers": {
+    "105dd194-6c1c-440b-a711-3a306b0c7590": {
+      "role": "Alex",
+      "port": 5173,
+      "subdomain": "arabic-youtube-transcript-translator-mjvuvd-44msid-0c7590",
+      "server": "6ccccb09-1c7d-41fe-aa15-47894de8abe7",
+      "cmd": "pnpm i && pnpm run lint && pnpm run dev",
+      "timeline_index": 36,
+      "status": "success",
+      "logs": []
+    }
+  },
+  "deploy": {}
+}
