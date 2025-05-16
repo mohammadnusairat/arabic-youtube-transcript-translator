@@ -26,16 +26,27 @@ function Home() {
     // Reset error state
     setError('');
     
-    // Validate URL
-    if (!validateYoutubeUrl(url)) {
+    // Validate and clean URL
+    const trimmedUrl = url.trim();
+    console.log('Processing URL:', trimmedUrl);
+    
+    if (!trimmedUrl) {
+      setError('Please enter a YouTube URL');
+      return;
+    }
+    
+    if (!validateYoutubeUrl(trimmedUrl)) {
       setError('Please enter a valid YouTube URL');
       return;
     }
     
     setIsLoading(true);
+    console.log('Submitting validated URL:', trimmedUrl);
     
     try {
-      const response = await submitUrl(url);
+      console.log('About to call submitUrl with:', trimmedUrl);
+      const response = await submitUrl(trimmedUrl);
+      console.log('Response received:', response);
       
       // Update job context with the new job
       setCurrentJob(response.data);

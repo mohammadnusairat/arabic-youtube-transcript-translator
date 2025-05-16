@@ -1,0 +1,48 @@
+[2025-05-15T23:52:10.103Z] Starting YouTube URL submission tests...
+[2025-05-15T23:52:10.109Z] ======= YOUTUBE URL DEBUGGING TEST =======
+[2025-05-15T23:52:10.109Z] 
+--- Testing: Standard JSON object ---
+[2025-05-15T23:52:10.109Z] Request URL: http://localhost:4000/api/transcribe
+[2025-05-15T23:52:10.109Z] Method: POST
+[2025-05-15T23:52:10.109Z] Headers: {"Content-Type":"application/json"}
+[2025-05-15T23:52:10.109Z] Body: {"url":"https://www.youtube.com/watch?v=lhbEO0EqH5c"}
+[2025-05-15T23:52:10.190Z] Response (400): {
+  "error": "YouTube URL is required"
+}
+[2025-05-15T23:52:10.190Z] ❌ FAILED: No JobID received
+[2025-05-15T23:52:10.190Z] 
+--- Testing: Raw URL string ---
+[2025-05-15T23:52:10.190Z] Request URL: http://localhost:4000/api/transcribe
+[2025-05-15T23:52:10.191Z] Method: POST
+[2025-05-15T23:52:10.191Z] Headers: {"Content-Type":"text/plain"}
+[2025-05-15T23:52:10.191Z] Body: https://www.youtube.com/watch?v=lhbEO0EqH5c
+[2025-05-15T23:52:10.197Z] Response (400): {
+  "error": "YouTube URL is required"
+}
+[2025-05-15T23:52:10.197Z] ❌ FAILED: No JobID received
+[2025-05-15T23:52:10.197Z] 
+--- Testing: URL in query string ---
+[2025-05-15T23:52:10.198Z] Request URL: http://localhost:4000/api/transcribe?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DlhbEO0EqH5c
+[2025-05-15T23:52:10.198Z] Method: GET
+[2025-05-15T23:52:10.198Z] Headers: {}
+[2025-05-15T23:52:10.202Z] Response (404): <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Error</title>
+</head>
+<body>
+<pre>Cannot GET /api/transcribe</pre>
+</body>
+</html>
+
+[2025-05-15T23:52:10.202Z] ❌ FAILED: No JobID received
+[2025-05-15T23:52:10.202Z] 
+--- Testing: Form data submission ---
+[2025-05-15T23:52:10.202Z] Request URL: http://localhost:4000/api/transcribe
+[2025-05-15T23:52:10.202Z] Method: POST
+[2025-05-15T23:52:10.202Z] Headers: {"Content-Type":"application/x-www-form-urlencoded"}
+[2025-05-15T23:52:10.202Z] Body: url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DlhbEO0EqH5c
+[2025-05-15T23:52:10.206Z] Response (400): {
+  "error": "YouTube URL is required"
+}
