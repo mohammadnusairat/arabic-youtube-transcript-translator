@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getJobStatus, getFile } from '../utils/api';
 import { useJobContext } from '../contexts/JobContext';
@@ -6,6 +6,7 @@ import { useJobContext } from '../contexts/JobContext';
 function Results() {
   const { jobId } = useParams();
   const navigate = useNavigate();
+  const hasRedirected = useRef(false);
   const { currentJob, setCurrentJob } = useJobContext();
   
   const [isLoading, setIsLoading] = useState(true);
@@ -18,15 +19,7 @@ function Results() {
   });
 
   useEffect(() => {
-    // Initialize with current job if available, otherwise fetch it
-    if (currentJob && currentJob.jobId === jobId && currentJob.status === 'completed') {
-      setVideoMetadata(currentJob.videoMetadata || {});
-      setFileUrls(currentJob.fileUrls || {});
-      fetchTranscriptPreview();
-      setIsLoading(false);
-    } else {
-      fetchJobData();
-    }
+    fetchJobData(); // Always fetch fresh job status
   }, [jobId]);
 
   const fetchJobData = async () => {
@@ -34,8 +27,8 @@ function Results() {
       setIsLoading(true);
       const response = await getJobStatus(jobId);
       
-      if (response.data.status !== 'completed') {
-        // If job is not completed, redirect to processing page
+      if (response.data.status !== 'completed' && !hasRedirected.current) {
+        hasRedirected.current = true;
         navigate(`/processing/${jobId}`);
         return;
       }
@@ -167,24 +160,28 @@ function Results() {
         
         <div className="flex flex-wrap gap-4 mb-6">
           <h3 className="w-full text-lg font-semibold text-gray-800 mb-2">Download Options:</h3>
-          <button 
-            onClick={() => handleDownload('pdf')}
-            className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-md transition-colors duration-300 flex items-center"
-          >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-            </svg>
-            Download PDF
-          </button>
-          <button 
-            onClick={() => handleDownload('markdown')}
-            className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition-colors duration-300 flex items-center"
-          >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-            </svg>
-            Download Markdown
-          </button>
+          {fileUrls.pdf && (
+            <button 
+              onClick={() => handleDownload('pdf')}
+              className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-md transition-colors duration-300 flex items-center"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              Download PDF
+            </button>
+          )}
+          {fileUrls.markdown && (
+            <button 
+              onClick={() => handleDownload('markdown')}
+              className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition-colors duration-300 flex items-center"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              Download Markdown
+            </button>
+          )}
           <button 
             onClick={handleCopyToClipboard}
             className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors duration-300 flex items-center"

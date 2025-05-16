@@ -17,11 +17,11 @@ const apiClient = axios.create({
  * @param {string} url - The YouTube URL to process
  * @returns {Promise<Object>} - API response data
  */
-export const submitUrl = async (url) => {
-  console.log('Submitting URL to backend:', url);
+export const submitUrl = async ({ url, startTime, endTime }) => {
+  console.log('Submitting URL to backend:', url, startTime, endTime);
 
   try {
-    const response = await apiClient.post('/transcribe', { url });
+    const response = await apiClient.post('/transcribe', { url, startTime, endTime });
     console.log('API response:', response.data);
     return { data: response.data };
   } catch (error) {

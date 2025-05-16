@@ -11,6 +11,10 @@ const config = require('../config/config');
 // Store job status in memory (in production, use a database)
 const jobsStatus = {};
 
+function sanitizeFilename(name) {
+  return name.replace(/[^a-zA-Z0-9-_ ]/g, '_').substring(0, 100).trim();
+}
+
 /**
  * Start a new transcription job
  */
@@ -40,6 +44,16 @@ exports.startTranscriptionJob = async (req, res) => {
       return res.status(400).json({ error: errorMsg });
     }
 
+    const startTime = req.body?.startTime;
+    const endTime = req.body?.endTime;
+
+    if ((startTime != null && isNaN(startTime)) || (endTime != null && isNaN(endTime))) {
+      return res.status(400).json({ error: 'startTime and endTime must be numbers in seconds' });
+    }
+    if (startTime >= endTime) {
+      return res.status(400).json({ error: 'startTime must be less than endTime' });
+    }
+
     const jobId = uuidv4();
     jobsStatus[jobId] = {
       status: 'INITIATED',
@@ -57,7 +71,7 @@ exports.startTranscriptionJob = async (req, res) => {
       updatedAt: new Date()
     };
 
-    processTranscriptionJob(jobId, youtubeUrl);
+    processTranscriptionJob(jobId, youtubeUrl, { startTime, endTime });
 
     return res.status(201).json({
       jobId,
@@ -84,6 +98,7 @@ exports.startUploadedFileJob = async (req, res, audioFilePath) => {
     const fileInfo = path.parse(audioFilePath);
     const fileName = fileInfo.name;
     const title = `Uploaded Audio: ${fileName}`;
+    const sanitizedTitle = sanitizeFilename(title);
     
     // Create a new job ID
     const jobId = uuidv4();
@@ -93,7 +108,7 @@ exports.startUploadedFileJob = async (req, res, audioFilePath) => {
       status: 'INITIATED',
       progress: 0,
       type: 'UPLOAD',
-      title,
+      sanitizedTitle,
       audioFile: audioFilePath,
       transcription: null,
       translation: null,
@@ -105,7 +120,7 @@ exports.startUploadedFileJob = async (req, res, audioFilePath) => {
     };
     
     // Process in the background
-    processUploadedFileJob(jobId, audioFilePath, title);
+    processUploadedFileJob(jobId, audioFilePath, sanitizedTitle);
     
     return jobId;
   } catch (error) {
@@ -172,7 +187,7 @@ exports.getJobResults = async (req, res) => {
 /**
  * Process the transcription job in the background
  */
-async function processTranscriptionJob(jobId, youtubeUrl) {
+async function processTranscriptionJob(jobId, youtubeUrl, options = {}) {
   try {
     const videoId = youtubeService.extractVideoId(youtubeUrl);
     const timestamp = Date.now();
@@ -181,13 +196,14 @@ async function processTranscriptionJob(jobId, youtubeUrl) {
 
     updateJobStatus(jobId, 'DOWNLOADING', 10, 'Downloading YouTube video audio');
 
-    const { filePath } = await youtubeService.extractAudio(youtubeUrl, outputFolder);
+    const filePath = await youtubeService.extractAudio(youtubeUrl, jobId, options);
 
     if (!filePath || !fs.existsSync(filePath)) {
       throw new Error('Audio file missing after download.');
     }
 
     const { title } = await youtubeService.getVideoDetails(youtubeUrl);
+    const sanitizedTitle = sanitizeFilename(title); // ✅ use cleaner filename
 
     updateJobStatus(jobId, 'TRANSCRIBING', 30, 'Transcribing audio', {
       videoId,
@@ -214,13 +230,12 @@ async function processTranscriptionJob(jobId, youtubeUrl) {
       translation
     });
 
-    const outputBaseName = `${videoId}_${timestamp}`;
-    const pdfPath = path.join(config.outputDir, 'pdf', `${outputBaseName}.pdf`);
-    const markdownPath = path.join(config.outputDir, 'markdown', `${outputBaseName}.md`);
+    const pdfPath = path.join(config.outputDir, 'pdf', `${sanitizedTitle}_${timestamp}.pdf`);
+    const markdownPath = path.join(config.outputDir, 'markdown', `${sanitizedTitle}_${timestamp}.md`);
 
     await Promise.all([
-      documentService.generatePDF(translation, title, pdfPath),
-      documentService.generateMarkdown(translation, title, markdownPath)
+      documentService.generatePDF(translation, sanitizedTitle, pdfPath, options.startTime || 0),
+      documentService.generateMarkdown(translation, sanitizedTitle, markdownPath, options.startTime || 0)
     ]);
 
     updateJobStatus(jobId, 'COMPLETED', 100, 'Transcription job completed successfully', {
@@ -240,7 +255,7 @@ async function processTranscriptionJob(jobId, youtubeUrl) {
 /**
  * Process an uploaded audio file
  */
-async function processUploadedFileJob(jobId, audioFilePath, title) {
+async function processUploadedFileJob(jobId, audioFilePath, sanitizedTitle) {
   try {
     // Step 1: Transcribe audio from Arabic
     updateJobStatus(jobId, 'TRANSCRIBING', 30, 'Transcribing uploaded audio');
@@ -262,8 +277,8 @@ async function processUploadedFileJob(jobId, audioFilePath, title) {
     const markdownPath = path.join(config.outputDir, 'markdown', `${outputBaseName}.md`);
     
     await Promise.all([
-      documentService.generatePDF(translation, title, pdfPath),
-      documentService.generateMarkdown(translation, title, markdownPath)
+      documentService.generatePDF(translation, sanitizedTitle, pdfPath, 0),
+      documentService.generateMarkdown(translation, sanitizedTitle, markdownPath, 0)
     ]);
     
     // Update job with completed status and file paths

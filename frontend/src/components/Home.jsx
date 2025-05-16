@@ -3,9 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { validateYoutubeUrl } from '../utils/validators';
 import { submitUrl } from '../utils/api';
 import { useJobContext } from '../contexts/JobContext';
+import axios from 'axios';
 
 function Home() {
   const [url, setUrl] = useState('');
+  const [startMinutes, setStartMinutes] = useState('');
+  const [startSeconds, setStartSeconds] = useState('');
+  const [endMinutes, setEndMinutes] = useState('');
+  const [endSeconds, setEndSeconds] = useState('');
+  const [videoDuration, setVideoDuration] = useState(null);
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [recentJobs, setRecentJobs] = useState([]);
@@ -19,6 +26,24 @@ function Home() {
       setRecentJobs(JSON.parse(savedJobs).slice(0, 5)); // Show only last 5 jobs
     }
   }, []);
+
+  const toSeconds = (min, sec) => {
+    return (parseInt(min) || 0) * 60 + (parseInt(sec) || 0);
+  };
+
+  const fetchMetadata = async () => {
+    setError('');
+    if (!validateYoutubeUrl(url)) {
+      return setError('Please enter a valid YouTube URL');
+    }
+
+    try {
+      const response = await axios.get('/api/metadata', { params: { url } });
+      setVideoDuration(response.data.durationSeconds);
+    } catch (err) {
+      setError('Failed to fetch video metadata');
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,13 +64,24 @@ function Home() {
       setError('Please enter a valid YouTube URL');
       return;
     }
+
+    const start = toSeconds(startMinutes, startSeconds);
+    const end = toSeconds(endMinutes, endSeconds);
+
+    if (!videoDuration) return setError('Please fetch video metadata first');
+    if (start >= end) return setError('Start time must be less than end time');
+    if (end > videoDuration) return setError('End time exceeds video duration');
     
     setIsLoading(true);
     console.log('Submitting validated URL:', trimmedUrl);
     
     try {
       console.log('About to call submitUrl with:', trimmedUrl);
-      const response = await submitUrl(trimmedUrl);
+      const response = await axios.post('/api/transcribe', {
+        url: trimmedUrl,
+        startTime: start,
+        endTime: end
+      });
       console.log('Response received:', response);
       
       // Update job context with the new job
@@ -95,33 +131,81 @@ function Home() {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://www.youtube.com/watch?v=..."
-              className="w-full p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className="w-full p-3 border border-gray-300 rounded-md"
               disabled={isLoading}
             />
           </div>
-          
+
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={fetchMetadata}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md"
+              disabled={isLoading}
+            >
+              Fetch Video Duration
+            </button>
+            {videoDuration && (
+              <p className="text-sm text-green-600 mt-2">
+                Video Duration: {videoDuration} seconds
+              </p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Start Time (min:sec)</label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  placeholder="Min"
+                  value={startMinutes}
+                  onChange={(e) => setStartMinutes(e.target.value)}
+                  className="w-1/2 p-2 border border-gray-300 rounded-md"
+                />
+                <input
+                  type="number"
+                  placeholder="Sec"
+                  value={startSeconds}
+                  onChange={(e) => setStartSeconds(e.target.value)}
+                  className="w-1/2 p-2 border border-gray-300 rounded-md"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">End Time (min:sec)</label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  placeholder="Min"
+                  value={endMinutes}
+                  onChange={(e) => setEndMinutes(e.target.value)}
+                  className="w-1/2 p-2 border border-gray-300 rounded-md"
+                />
+                <input
+                  type="number"
+                  placeholder="Sec"
+                  value={endSeconds}
+                  onChange={(e) => setEndSeconds(e.target.value)}
+                  className="w-1/2 p-2 border border-gray-300 rounded-md"
+                />
+              </div>
+            </div>
+          </div>
+
           {error && (
             <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-md">
               {error}
             </div>
           )}
-          
+
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors duration-300 disabled:bg-blue-400"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md"
           >
-            {isLoading ? (
-              <span className="flex items-center justify-center">
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Processing...
-              </span>
-            ) : (
-              'Start Processing'
-            )}
+            {isLoading ? 'Submitting...' : 'Start Processing'}
           </button>
         </form>
       </div>
@@ -131,17 +215,13 @@ function Home() {
           <h2 className="text-xl font-semibold text-gray-800 mb-4">Recent Conversions</h2>
           <div className="space-y-4">
             {recentJobs.map((job) => (
-              <div 
+              <div
                 key={job.id}
                 onClick={() => navigate(`/results/${job.id}`)}
                 className="flex items-center space-x-4 p-3 border border-gray-200 rounded-md cursor-pointer hover:bg-gray-50"
               >
                 {job.thumbnail && (
-                  <img 
-                    src={job.thumbnail} 
-                    alt={job.title} 
-                    className="w-20 h-12 object-cover rounded"
-                  />
+                  <img src={job.thumbnail} alt={job.title} className="w-20 h-12 object-cover rounded" />
                 )}
                 <div className="flex-1">
                   <h3 className="font-medium text-gray-800">{job.title}</h3>

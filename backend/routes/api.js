@@ -5,6 +5,8 @@ const transcriptController = require('../controllers/transcriptController');
 const uploadMiddleware = require('../middleware/uploadMiddleware');
 const youtubeService = require('../services/youtubeService');
 const youtubeUrlExtractor = require('../middleware/youtubeUrlExtractor');
+const { exec } = require('child_process');
+const path = require('path');
 
 // POST YouTube URL for transcription
 router.post(
@@ -78,6 +80,41 @@ router.post('/validate-url', async (req, res) => {
 // Health check
 router.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
+});
+
+// GET /api/metadata?url=https://youtu.be/...
+router.get('/metadata', async (req, res) => {
+  const url = req.query.url;
+  if (!url || typeof url !== 'string') {
+    return res.status(400).json({ error: 'Missing or invalid YouTube URL' });
+  }
+
+  const ytDlpPath = path.join(
+    'C:/Users/mnusa/AppData/Roaming/Python/Python313/Scripts/yt-dlp.exe'
+  );
+
+  exec(`"${ytDlpPath}" --no-warnings --get-duration "${url}"`, (err, stdout, stderr) => {
+    if (err) {
+      console.error('[yt-dlp error]', stderr || err.message);
+      return res.status(500).json({ error: 'Failed to get video duration' });
+    }
+
+    const raw = stdout.trim(); // e.g., 14:32 or 1:10:20
+    const parts = raw.split(':').map(Number);
+    let durationSeconds = 0;
+
+    if (parts.length === 3) {
+      durationSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+    } else if (parts.length === 2) {
+      durationSeconds = parts[0] * 60 + parts[1];
+    } else if (parts.length === 1) {
+      durationSeconds = parts[0];
+    } else {
+      return res.status(500).json({ error: 'Could not parse duration output' });
+    }
+
+    res.json({ durationSeconds });
+  });
 });
 
 module.exports = router;

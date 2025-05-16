@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getJobStatus, cancelJob } from '../utils/api';
 import { useJobContext } from '../contexts/JobContext';
@@ -6,6 +6,7 @@ import { useJobContext } from '../contexts/JobContext';
 function Processing() {
   const { jobId } = useParams();
   const navigate = useNavigate();
+  const hasNavigated = useRef(false);
   const { currentJob, setCurrentJob } = useJobContext();
   
   const [status, setStatus] = useState('');
@@ -13,28 +14,75 @@ function Processing() {
   const [error, setError] = useState('');
   const [videoMetadata, setVideoMetadata] = useState({});
   const [estimatedTime, setEstimatedTime] = useState('');
+  const [remainingTime, setRemainingTime] = useState(null);
   const [intervalId, setIntervalId] = useState(null);
 
-  useEffect(() => {
-    // Initialize with current job if available, otherwise fetch it
-    if (currentJob && currentJob.jobId === jobId) {
-      setStatus(currentJob.status || 'initializing');
-      setVideoMetadata(currentJob.videoMetadata || {});
-    } else {
-      fetchJobStatus();
-    }
+  // derived clip duration for simulating time-based stages
+  const clipDurationInSeconds = currentJob?.endTime && currentJob?.startTime
+    ? currentJob.endTime - currentJob.startTime
+    : 60; // default fallback if not yet loaded
 
-    // Set up status polling
-    const interval = setInterval(fetchJobStatus, 3000);
+  const STAGE_DURATIONS = {
+    transcribing: 0.4 * clipDurationInSeconds * 1000,
+    translating: 0.3 * clipDurationInSeconds * 1000,
+    generating_documents: 0.3 * clipDurationInSeconds * 1000
+  };
+
+
+  useEffect(() => {
+    let interval;
+
+    const poll = async () => {
+      await fetchJobStatus();
+    };
+
+    poll(); // initial call
+
+    interval = setInterval(poll, 2000);
     setIntervalId(interval);
 
-    // Clean up on unmount
     return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
+      clearInterval(interval);
     };
   }, [jobId]);
+
+  // Simulated smooth progress for stages based on video duration
+  useEffect(() => {
+    let interval;
+    const stage = status;
+
+    if (!['transcribing', 'translating', 'generating_documents'].includes(stage)) return;
+
+    const targetDuration = STAGE_DURATIONS[stage]; // in ms
+    const incrementInterval = 1000; // 1s
+    const totalSteps = Math.floor(targetDuration / incrementInterval);
+    let currentStep = Math.floor((progress[stage] || 0) / (100 / totalSteps));
+    let remainingMs = targetDuration - (currentStep * incrementInterval);
+
+    interval = setInterval(() => {
+      currentStep++;
+      const simulatedProgress = Math.min(100, (currentStep / totalSteps) * 100);
+
+      // Update progress
+      setProgress(prev => ({
+        ...prev,
+        [stage]: simulatedProgress
+      }));
+
+      // Update remaining time
+      remainingMs = Math.max(0, remainingMs - incrementInterval);
+      const minutes = Math.floor(remainingMs / 60000);
+      const seconds = Math.floor((remainingMs % 60000) / 1000);
+      setRemainingTime(`${minutes}m ${seconds < 10 ? '0' : ''}${seconds}s`);
+
+      if (simulatedProgress >= 100) {
+        clearInterval(interval);
+        setRemainingTime(null);
+      }
+    }, incrementInterval);
+
+    return () => clearInterval(interval);
+  }, [status, progress, currentJob]);
 
   const fetchJobStatus = async () => {
     try {
@@ -49,8 +97,8 @@ function Processing() {
       setCurrentJob(response.data);
       
       // If processing is complete, navigate to results page
-      if (response.data.status === 'completed') {
-        clearInterval(intervalId);
+      if (!hasNavigated.current && normalizedStatus === 'completed') {
+        hasNavigated.current = true;
         navigate(`/results/${jobId}`);
       }
 
@@ -177,7 +225,9 @@ function Processing() {
               />
             )}
             <div>
-              <h2 className="text-lg font-semibold text-gray-800">{videoMetadata.title || 'Loading video details...'}</h2>
+              <h2 className="text-lg font-semibold text-gray-800">
+                {videoMetadata.title ? videoMetadata.title : 'Fetching video details...'}
+              </h2>
               {videoMetadata.channelTitle && (
                 <p className="text-gray-600">
                   {videoMetadata.channelTitle} | Duration: {videoMetadata.duration || '--:--'}
@@ -312,6 +362,14 @@ function Processing() {
           <div className="mb-6 text-center">
             <p className="text-gray-600">
               Estimated completion time: {estimatedTime}
+            </p>
+          </div>
+        )}
+
+        {remainingTime && (
+          <div className="mb-6 text-center">
+            <p className="text-sm text-gray-500">
+              ⏳ Time remaining for {status.replace('_', ' ')}: {remainingTime}
             </p>
           </div>
         )}

@@ -6,7 +6,7 @@ const config = require('../config/config');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegPath = require('ffmpeg-static');
 
-ffmpeg.setFfmpegPath(ffmpegPath);
+// ffmpeg.setFfmpegPath(ffmpegPath);
 
 exports.transcribeAudio = async (audioFilePath) => {
   try {
@@ -45,6 +45,9 @@ exports.transcribeAudio = async (audioFilePath) => {
     }
     pushStream.close();
 
+    const speechConfig = sdk.SpeechConfig.fromSubscription(apiKey, region);
+    speechConfig.speechRecognitionLanguage = 'ar-EG';
+    
     const audioConfig = sdk.AudioConfig.fromStreamInput(pushStream);
     const recognizer = new sdk.SpeechRecognizer(speechConfig, audioConfig);
 
@@ -97,13 +100,13 @@ exports.transcribeAudio = async (audioFilePath) => {
         }
       };
 
-      setTimeout(() => {
-        console.warn('[TRANSCRIBE] Timeout reached. Forcing stop...');
-        recognizer.stopContinuousRecognitionAsync(() => {
-          recognizer.close();
-          resolve(transcriptionSegments); // return whatever we got
-        });
-      }, 20000); // 20 seconds timeout
+      // setTimeout(() => {
+      //   console.warn('[TRANSCRIBE] Timeout reached. Forcing stop...');
+      //   recognizer.stopContinuousRecognitionAsync(() => {
+      //     recognizer.close();
+      //     resolve(transcriptionSegments); // return whatever we got
+      //   });
+      // }, 20000); // 20 seconds timeout
 
       recognizer.startContinuousRecognitionAsync(
         () => console.log('[TRANSCRIBE] Recognition started'),

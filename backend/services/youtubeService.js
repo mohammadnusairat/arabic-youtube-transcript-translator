@@ -1,130 +1,116 @@
 // services/youtubeService.js
-const fs = require('fs-extra');
+
+const { spawn } = require('child_process');
 const path = require('path');
+const fs = require('fs-extra');
 const { v4: uuidv4 } = require('uuid');
-const ytDlpExec = require('yt-dlp-exec');
-const ffmpeg = require('fluent-ffmpeg');
-const { FFMPEG_PATH } = require('../config/config');
-
-// Explicit path to yt-dlp binary
-//const ytDlpPath = process.env.YT_DLP_BINARY || path.join(__dirname, '..', 'node_modules', 'yt-dlp-exec', 'bin', 'yt-dlp.exe');
-
-// Create yt-dlp instance with custom binary path
-//const ytdlp = ytDlpExec.create({ binary: ytDlpPath }).exec;
-
-// Set path to ffmpeg binary
-ffmpeg.setFfmpegPath(FFMPEG_PATH);
+const config = require('../config/config');
 
 /**
- * Extract video ID from YouTube URL
+ * Validate if URL is a YouTube link
  */
-function extractVideoId(url) {
-  url = url.split('?')[0].trim();
+exports.isValidYouTubeUrl = (url) => {
+  return /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//.test(url);
+};
 
-  const standardMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([^&\s]+)/);
-  const shortsMatch = url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]+)/);
+/**
+ * Extract YouTube video ID
+ */
+exports.extractVideoId = (url) => {
+  const match = url.match(/(?:v=|\/)([0-9A-Za-z_-]{11})(?:&|$)/);
+  return match ? match[1] : uuidv4();
+};
 
-  if (standardMatch) return standardMatch[1];
-  if (shortsMatch) return shortsMatch[1];
-
-  return null;
+/**
+ * Sanitize YouTube URL by removing 't' (start time) parameter and others that break shell commands
+ * @param {string} url 
+ * @returns {string} sanitized url
+ */
+function sanitizeYouTubeUrl(url) {
+  // Remove 't' parameter (?t= or &t= with optional seconds suffix)
+  return url.replace(/([&?])t=\d+s?/, '');
 }
 
 /**
- * Validate YouTube URL
+ * Extract audio from YouTube URL using yt-dlp, then trim with ffmpeg
  */
-exports.isValidYouTubeUrl = (url) => {
-  if (!url) return false;
-  const regex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/;
-  return regex.test(url) && !!extractVideoId(url);
-};
+exports.extractAudio = async (url, jobId, options = {}) => {
+  const { startTime, endTime } = options;
+  const outputDir = path.join(__dirname, '../temp/yt-dlp');
+  await fs.ensureDir(outputDir);
 
-/**
- * Download and extract audio using yt-dlp
- */
-exports.extractAudio = async (videoUrl, outputDir) => {
-  try {
-    console.log(`[YT-DLP] Fetching audio from: ${videoUrl}`);
+  const rawOutputPath = path.join(outputDir, `${jobId}.mp3`);
+  const trimmedOutputPath = path.join(outputDir, `${jobId}_trimmed.mp3`);
 
-    await fs.ensureDir(outputDir);
+  // Sanitize URL to remove &t=... that breaks Windows shell
+  const cleanUrl = sanitizeYouTubeUrl(url);
 
-    const audioBase = uuidv4();
-    const outputTemplate = path.join(outputDir, `${audioBase}.%(ext)s`).replace(/\\/g, '/'); // ✅ convert Windows-style slashes to forward slashes
+  const ytArgs = [
+    cleanUrl,
+    '--extract-audio',
+    '--audio-format', 'mp3',
+    '--audio-quality', '0',
+    '--no-check-certificates',
+    '--no-warnings',
+    '--add-metadata',
+    '--output', rawOutputPath
+  ];
 
-    const finalWav = path.join(outputDir, `${audioBase}.wav`);
-    await fs.ensureDir(path.dirname(outputTemplate)); // ✅ ensure the parent dir exists
+  const ytCommand = "C:\\Users\\mnusa\\AppData\\Roaming\\Python\\Python313\\Scripts\\yt-dlp.exe";
 
-    // ✅ Step 1: Download MP3 using yt-dlp with correct output template
-    await ytDlpExec(videoUrl, {
-      extractAudio: true,
-      audioFormat: 'mp3',
-      audioQuality: 0,
-      output: outputTemplate, // ✅ Correct template
-      noCheckCertificates: true,
-      noWarnings: true,
-      preferFreeFormats: true,
-      addMetadata: true,
+  console.log('[YT-DLP COMMAND]', ytCommand, ytArgs.join(' '));
+
+  // Step 1: Download full audio
+  await new Promise((resolve, reject) => {
+    const ytProcess = spawn(ytCommand, ytArgs, { shell: true });
+
+    ytProcess.stderr.on('data', (data) => console.error('[YT-DLP STDERR]', data.toString()));
+    ytProcess.on('error', (err) => reject(new Error(`yt-dlp failed: ${err.message}`)));
+    ytProcess.on('exit', (code) => {
+      if (code !== 0) return reject(new Error(`yt-dlp exited with code ${code}`));
+      resolve();
     });
+  });
 
-    // ✅ Step 2: Convert to mono 16kHz WAV using ffmpeg
+  // Step 2: Trim audio with ffmpeg (only if time range is given)
+  if (startTime != null && endTime != null) {
+    const ffmpegArgs = [
+      '-y',
+      '-i', rawOutputPath,
+      '-ss', startTime.toString(),
+      '-to', endTime.toString(),
+      '-c', 'copy',
+      trimmedOutputPath
+    ];
+
+    console.log('[FFMPEG COMMAND] ffmpeg', ffmpegArgs.join(' '));
+
     await new Promise((resolve, reject) => {
-      ffmpeg(path.join(outputDir, `${audioBase}.mp3`)) // 👈 THIS LINE GOES HERE
-        .audioChannels(1)
-        .audioFrequency(16000)
-        .format('wav')
-        .on('end', resolve)
-        .on('error', reject)
-        .save(finalWav);
+      const ffmpeg = spawn('ffmpeg', ffmpegArgs);
+
+      ffmpeg.stderr.on('data', (data) => console.error('[FFMPEG STDERR]', data.toString()));
+      ffmpeg.on('error', (err) => reject(new Error(`ffmpeg failed: ${err.message}`)));
+      ffmpeg.on('exit', (code) => {
+        if (code !== 0) return reject(new Error(`ffmpeg exited with code ${code}`));
+        resolve();
+      });
     });
 
-    console.log(`[FFMPEG] Audio converted to WAV: ${finalWav}`);
-    return { filePath: finalWav };
-  } catch (err) {
-    console.error('[YT-DLP/FFMPEG ERROR]', err);
-    throw new Error('An error occurred while downloading or converting audio. Please try a different video.');
+    await fs.remove(rawOutputPath); // Remove original
+    await fs.move(trimmedOutputPath, rawOutputPath); // Replace with trimmed version
   }
+
+  return rawOutputPath;
 };
 
 /**
- * Get basic video metadata using yt-dlp
+ * Get basic video details
  */
-exports.getVideoDetails = async (videoUrl) => {
-  try {
-    const info = await ytDlpExec(videoUrl, {
-      dumpJson: true,
-      noWarnings: true,
-    });
-
-    return {
-      title: info.title,
-      channel: info.channel || info.uploader,
-      duration: parseInt(info.duration, 10) || 0,
-    };
-  } catch (error) {
-    console.error('[YT-DLP META ERROR]', error.message);
-    return {
-      title: 'Unknown Title',
-      channel: 'Unknown Channel',
-      duration: 0,
-    };
-  }
+exports.getVideoDetails = async (youtubeUrl) => {
+  const iso = new Date().toISOString().replace(/[:]/g, '-'); // <-- sanitize colons
+  return {
+    title: `YouTube Video - ${iso}`,
+    channel: 'Unknown Channel',
+    duration: 0
+  };
 };
-
-/**
- * Check if the video is accessible
- */
-exports.checkVideoAvailability = async (url) => {
-  try {
-    await ytDlpExec(url, {
-      skipDownload: true,
-      quiet: true,
-      simulate: true,
-    });
-    return true;
-  } catch (err) {
-    console.error('[YT-DLP AVAILABILITY ERROR]', err.message);
-    return false;
-  }
-};
-
-exports.extractVideoId = extractVideoId;
