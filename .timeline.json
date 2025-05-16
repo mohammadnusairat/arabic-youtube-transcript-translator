@@ -1,5 +1,5 @@
 {
-  "timeline_index": 266,
+  "timeline_index": 334,
   "planner": {
     "Team Leader": {
       "1": {
@@ -15,7 +15,7 @@
         "start_at": 1747350564.86118,
         "end_at": 1747350868.8016062
       },
-      "current_task_id": "3",
+      "current_task_id": "4",
       "2": {
         "task_id": "2",
         "dependent_task_ids": [],
@@ -42,7 +42,22 @@
         "is_finished": true,
         "assignee": "Alex",
         "start_at": 1747351063.3495247,
-        "end_at": 1747354214.2931979
+        "end_at": 1747355214.3968966
+      },
+      "4": {
+        "task_id": "4",
+        "dependent_task_ids": [
+          "3"
+        ],
+        "instruction": "Investigate and fix the Azure Speech SDK authentication error (400 - Invalid Authentication Token) by examining the key format, implementation, and configuration files. Create a test script to verify the fix works correctly.",
+        "task_type": "general",
+        "code": "",
+        "result": "",
+        "is_success": false,
+        "is_finished": true,
+        "assignee": "Alex",
+        "start_at": 1747355214.3969023,
+        "end_at": 1747356121.0342572
       }
     }
   },
@@ -306,7 +321,69 @@
     "263": 1,
     "264": 1,
     "265": 1,
-    "266": 1
+    "266": 1,
+    "267": 1,
+    "268": 1,
+    "269": 1,
+    "271": 1,
+    "272": 1,
+    "273": 1,
+    "274": 1,
+    "276": 1,
+    "277": 1,
+    "278": 1,
+    "279": 1,
+    "280": 1,
+    "282": 1,
+    "283": 1,
+    "284": 1,
+    "285": 1,
+    "286": 1,
+    "287": 1,
+    "288": 1,
+    "289": 1,
+    "290": 1,
+    "291": 1,
+    "292": 1,
+    "293": 0,
+    "294": 1,
+    "295": 1,
+    "296": 1,
+    "297": 1,
+    "298": 1,
+    "299": 1,
+    "300": 1,
+    "301": 1,
+    "302": 1,
+    "303": 1,
+    "304": 1,
+    "305": 1,
+    "306": 1,
+    "307": 0,
+    "308": 1,
+    "309": 1,
+    "310": 1,
+    "311": 1,
+    "312": 1,
+    "313": 1,
+    "314": 1,
+    "315": 1,
+    "316": 1,
+    "317": 1,
+    "318": 1,
+    "319": 1,
+    "320": 1,
+    "322": 1,
+    "323": 1,
+    "324": 1,
+    "325": 1,
+    "326": 1,
+    "327": 1,
+    "329": 1,
+    "330": 1,
+    "332": 1,
+    "333": 1,
+    "334": 1
   },
   "preview_servers": {
     "7e98a76b-ad04-4c94-ade6-737038768161": {

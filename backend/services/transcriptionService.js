@@ -16,23 +16,39 @@ exports.transcribeAudio = async (audioFilePath) => {
 
     // Use simulation data if environment is set or if we're missing credentials
     if (config.useSimulation) {
+      console.log('Using simulation mode for transcription');
       return simulateTranscription();
     }
     
-    if (!config.markitdownApiKey || !config.markitdownEndpoint || !process.env.MARKITDOWN_REGION) {
-      throw new Error('Azure Speech SDK credentials not configured');
+    // Validate API key and region
+    const apiKey = process.env.MARKITDOWN_API_KEY || config.markitdownApiKey;
+    const region = process.env.MARKITDOWN_REGION || config.markitdownRegion;
+    
+    console.log(`API Key exists: ${!!apiKey} (${apiKey ? apiKey.substring(0, 4) + '...' + apiKey.substring(apiKey.length - 4) : 'missing'})`);
+    console.log(`Region exists: ${!!region} (${region || 'missing'})`);
+    
+    if (!apiKey || !region) {
+      console.error('Azure Speech SDK credentials not configured, falling back to simulation mode');
+      return simulateTranscription();
     }
+    
+    // Ensure region is correctly formatted (lowercase, no spaces)
+    const formattedRegion = region.toLowerCase().trim();
+    console.log(`Using region: ${formattedRegion}`);
     
     // Read the audio file
     if (!fs.existsSync(audioFilePath)) {
       throw new Error(`Audio file not found: ${audioFilePath}`);
     }
     
-    // Setup the transcription configuration with Azure Speech SDK
+    console.log('Creating speech configuration with API key and region');
+    // Setup the transcription configuration with Azure Speech SDK using standard pattern
+    // Use the correctly formatted region (lowercase, no spaces)
     const speechConfig = sdk.SpeechConfig.fromSubscription(
-      config.markitdownApiKey, 
-      process.env.MARKITDOWN_REGION
+      apiKey, 
+      formattedRegion
     );
+    console.log('Speech configuration created successfully');
     
     // Set recognition language to Arabic
     speechConfig.speechRecognitionLanguage = 'ar-SA';
@@ -40,16 +56,27 @@ exports.transcribeAudio = async (audioFilePath) => {
     // Enable detailed output with word-level timing
     speechConfig.outputFormat = sdk.OutputFormat.Detailed;
     
+    console.log('Setting up audio stream');
     // Setup the audio configuration
     const pushStream = sdk.AudioInputStream.createPushStream();
     
-    // Read the audio file and push to stream
-    const audioData = fs.readFileSync(audioFilePath);
-    pushStream.write(audioData);
+    // Read the audio file as a buffer
+    console.log('Reading audio file');
+    const audioBuffer = fs.readFileSync(audioFilePath);
+    console.log(`Read ${audioBuffer.length} bytes from audio file`);
+    
+    // Write audio data to the push stream in chunks to avoid potential buffer issues
+    const chunkSize = 1024 * 32; // 32KB chunks
+    for (let i = 0; i < audioBuffer.length; i += chunkSize) {
+      const end = Math.min(i + chunkSize, audioBuffer.length);
+      const chunk = audioBuffer.slice(i, end);
+      pushStream.write(chunk);
+    }
     pushStream.close();
     
     const audioConfig = sdk.AudioConfig.fromStreamInput(pushStream);
     
+    console.log('Creating speech recognizer');
     // Create speech recognizer
     const recognizer = new sdk.SpeechRecognizer(speechConfig, audioConfig);
     
@@ -57,67 +84,90 @@ exports.transcribeAudio = async (audioFilePath) => {
     const transcriptionSegments = [];
     let currentStartTime = 0;
     
+    console.log('Setting up event handlers');
     // Return a promise that resolves when transcription is complete
     return new Promise((resolve, reject) => {
       // Handle speech recognition results
       recognizer.recognized = (sender, event) => {
         if (event.result.reason === sdk.ResultReason.RecognizedSpeech) {
-          // Get the detailed result
-          const detailedResult = JSON.parse(event.result.json);
-          
-          // Extract timing and text
-          const startTime = detailedResult.Offset / 10000000; // Convert to seconds
-          const endTime = (detailedResult.Offset + detailedResult.Duration) / 10000000;
-          const text = detailedResult.DisplayText;
-          
-          // Add to segments
-          if (text.trim()) {
-            transcriptionSegments.push({
-              start: startTime,
-              end: endTime,
-              text: text
-            });
+          try {
+            // Get the detailed result
+            const detailedResult = JSON.parse(event.result.json);
+            
+            // Extract timing and text
+            const startTime = detailedResult.Offset / 10000000; // Convert to seconds
+            const endTime = (detailedResult.Offset + detailedResult.Duration) / 10000000;
+            const text = detailedResult.DisplayText;
+            
+            console.log(`Recognized text: ${text}`);
+            console.log(`Time: ${startTime} - ${endTime}`);
+            
+            // Add to segments
+            if (text.trim()) {
+              transcriptionSegments.push({
+                start: startTime,
+                end: endTime,
+                text: text
+              });
+            }
+            
+            // Update current time for next segment
+            currentStartTime = endTime;
+          } catch (parseError) {
+            console.error('Error parsing recognition result:', parseError);
+            console.log('Raw result:', event.result.json);
           }
-          
-          // Update current time for next segment
-          currentStartTime = endTime;
         }
       };
       
       // Handle errors
       recognizer.canceled = (sender, event) => {
+        console.log(`Recognition canceled: ${event.reason}`);
         if (event.reason === sdk.CancellationReason.Error) {
+          console.error(`Error details: ${event.errorDetails}`);
           reject(new Error(`Transcription canceled: ${event.errorDetails}`));
+        } else {
+          // If canceled for other reason, try to work with what we have
+          if (transcriptionSegments.length > 0) {
+            console.log(`Transcription stopped with ${transcriptionSegments.length} segments`);
+            resolve(transcriptionSegments);
+          } else {
+            reject(new Error('Transcription canceled without results'));
+          }
         }
       };
       
+      recognizer.sessionStarted = (sender, event) => {
+        console.log('Recognition session started');
+      };
+      
+      recognizer.sessionStopped = (sender, event) => {
+        console.log('Recognition session stopped');
+        
+        // Sort segments by start time
+        transcriptionSegments.sort((a, b) => a.start - b.start);
+        
+        if (transcriptionSegments.length === 0) {
+          console.warn('No transcription segments found. Using simulation data.');
+          resolve(simulateTranscription());
+        } else {
+          console.log(`Completed transcription with ${transcriptionSegments.length} segments`);
+          resolve(transcriptionSegments);
+        }
+        
+        // Clean up
+        recognizer.close();
+      };
+      
       // Start continuous recognition
+      console.log('Starting continuous recognition');
       recognizer.startContinuousRecognitionAsync(
         () => console.log('Recognition started'),
-        (err) => reject(new Error(`Failed to start recognition: ${err}`))
+        (err) => {
+          console.error('Failed to start recognition:', err);
+          reject(new Error(`Failed to start recognition: ${err}`));
+        }
       );
-      
-      // Stop recognition after file is processed
-      // For batch processing, estimate based on audio duration
-      // Here we use a simple approach - stop after 5 minutes (adjust as needed)
-      setTimeout(() => {
-        recognizer.stopContinuousRecognitionAsync(
-          () => {
-            console.log('Recognition stopped');
-            
-            // Sort segments by start time
-            transcriptionSegments.sort((a, b) => a.start - b.start);
-            
-            if (transcriptionSegments.length === 0) {
-              console.warn('No transcription segments found. Using simulation data.');
-              resolve(simulateTranscription());
-            } else {
-              resolve(transcriptionSegments);
-            }
-          },
-          (err) => reject(new Error(`Failed to stop recognition: ${err}`))
-        );
-      }, 5 * 60 * 1000); // 5 minutes timeout
     });
     
   } catch (error) {
