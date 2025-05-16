@@ -1,11 +1,14 @@
 // middleware/uploadMiddleware.js
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs-extra');
-const config = require('../config/config');
 
 // Ensure upload directory exists
-const uploadDir = path.join(__dirname, '..', config.uploadDir, 'audio');
+const path = require('path');
+const fs = require('fs-extra');
+const multer = require('multer');
+const config = require('../config/config');
+
+// Correct: use already-joined absolute path
+const uploadDir = path.join(config.uploadDir, 'audio');
+
 fs.ensureDirSync(uploadDir);
 
 // Configure multer for file uploads

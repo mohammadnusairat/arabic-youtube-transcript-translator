@@ -49,3 +49,4 @@ test-results/
 pnpm-lock.yaml
 *.pyc
 __pycache__
+IMPORTANT_KEYS.txt

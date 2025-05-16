@@ -20,42 +20,27 @@ exports.startTranscriptionJob = async (req, res) => {
     console.log('Headers:', JSON.stringify(req.headers));
     console.log('Request Body Type:', typeof req.body);
     console.log('Request Body:', req.body);
-    
-    // Get the YouTube URL extracted by our middleware
+
     let youtubeUrl = req.youtubeUrl || req.extractedYouTubeUrl;
-    
-    // Fallback to body.url if middleware failed to extract URL
-    if (!youtubeUrl && req.body && req.body.url) {
+
+    if (!youtubeUrl && req.body?.url) {
       youtubeUrl = req.body.url;
       console.log('Fallback to req.body.url:', youtubeUrl);
     }
-    
-    console.log('Using URL for processing:', youtubeUrl);
-    
+
     if (!youtubeUrl || youtubeUrl.trim() === '') {
       const errorMsg = 'YouTube URL is required';
       console.error(errorMsg);
-      console.error('Request details:', {
-        body: req.body,
-        bodyType: typeof req.body,
-        headers: req.headers,
-        method: req.method,
-        path: req.path
-      });
       return res.status(400).json({ error: errorMsg });
     }
-    
-    // Validate the YouTube URL
+
     if (!youtubeService.isValidYouTubeUrl(youtubeUrl)) {
       const errorMsg = 'Invalid YouTube URL format';
       console.error(errorMsg, youtubeUrl);
       return res.status(400).json({ error: errorMsg });
     }
 
-    // Create a new job ID
     const jobId = uuidv4();
-    
-    // Initialize job status
     jobsStatus[jobId] = {
       status: 'INITIATED',
       progress: 0,
@@ -72,7 +57,6 @@ exports.startTranscriptionJob = async (req, res) => {
       updatedAt: new Date()
     };
 
-    // Process in the background
     processTranscriptionJob(jobId, youtubeUrl);
 
     return res.status(201).json({
@@ -190,52 +174,64 @@ exports.getJobResults = async (req, res) => {
  */
 async function processTranscriptionJob(jobId, youtubeUrl) {
   try {
-    // Step 1: Get video info and download audio
+    const videoId = youtubeService.extractVideoId(youtubeUrl);
+    const timestamp = Date.now();
+    const outputFileName = `${videoId}_${timestamp}.mp3`;
+    const outputPath = path.join(config.tempDir, outputFileName);
+
     updateJobStatus(jobId, 'DOWNLOADING', 10, 'Downloading YouTube video audio');
-    const { videoId, title, audioFile } = await youtubeService.extractAudio(youtubeUrl);
-    
-    // Update job with video details
+
+    const { filePath } = await youtubeService.extractAudio(youtubeUrl, outputPath);
+
+    if (!filePath || !fs.existsSync(filePath)) {
+      throw new Error('Audio file missing after download.');
+    }
+
+    const { title } = await youtubeService.getVideoDetails(youtubeUrl);
+
     updateJobStatus(jobId, 'TRANSCRIBING', 30, 'Transcribing audio', {
       videoId,
       title,
-      audioFile
+      audioFile: filePath
     });
 
-    // Step 2: Transcribe audio from Arabic
-    const transcription = await transcriptionService.transcribeAudio(audioFile);
+    const transcription = await transcriptionService.transcribeAudio(filePath);
+
     updateJobStatus(jobId, 'TRANSLATING', 60, 'Translating transcription to English', {
       transcription
     });
 
-    // Step 3: Translate from Arabic to English
-    const translation = await translationService.translateText(transcription);
+    let translation;
+    try {
+      translation = await translationService.translateText(transcription);
+    } catch (err) {
+      console.error(`[JOB FAILED: ${jobId}] Translation error:`, err);
+      updateJobStatus(jobId, 'FAILED', 0, 'Translation failed', { error: err.message });
+      return;
+    }
+
     updateJobStatus(jobId, 'GENERATING_DOCUMENTS', 80, 'Generating output documents', {
       translation
     });
 
-    // Step 4: Generate PDF and Markdown files
-    const outputBaseName = `${videoId}_${Date.now()}`;
+    const outputBaseName = `${videoId}_${timestamp}`;
     const pdfPath = path.join(config.outputDir, 'pdf', `${outputBaseName}.pdf`);
     const markdownPath = path.join(config.outputDir, 'markdown', `${outputBaseName}.md`);
-    
+
     await Promise.all([
       documentService.generatePDF(translation, title, pdfPath),
       documentService.generateMarkdown(translation, title, markdownPath)
     ]);
 
-    // Update job with completed status and file paths
     updateJobStatus(jobId, 'COMPLETED', 100, 'Transcription job completed successfully', {
       pdfUrl: pdfPath,
       markdownUrl: markdownPath
     });
 
-    // Cleanup temporary files
-    await fs.remove(audioFile);
+    await fs.remove(filePath);
   } catch (error) {
-    console.error(`Error processing job ${jobId}:`, error);
-    updateJobStatus(jobId, 'FAILED', 0, `Error: ${error.message}`, { 
-      error: error.message 
-    });
+    console.error(`[JOB FAILED: ${jobId}]`, error);
+    updateJobStatus(jobId, 'FAILED', 0, `Error: ${error.message}`, { error: error.message });
   }
 }
 
@@ -298,7 +294,6 @@ async function processUploadedFileJob(jobId, audioFilePath, title) {
  */
 function updateJobStatus(jobId, status, progress, message = null, data = {}) {
   if (!jobsStatus[jobId]) return;
-  
   jobsStatus[jobId] = {
     ...jobsStatus[jobId],
     ...data,
@@ -307,7 +302,6 @@ function updateJobStatus(jobId, status, progress, message = null, data = {}) {
     message,
     updatedAt: new Date()
   };
-  
   console.log(`Job ${jobId} status updated to ${status} (${progress}%): ${message}`);
 }
 
