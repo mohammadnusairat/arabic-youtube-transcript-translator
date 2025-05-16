@@ -15,7 +15,8 @@ function Processing() {
   const [videoMetadata, setVideoMetadata] = useState({});
   const [estimatedTime, setEstimatedTime] = useState('');
   const [remainingTime, setRemainingTime] = useState(null);
-  const [intervalId, setIntervalId] = useState(null);
+  const pollingIntervalRef = useRef(null);
+  const [shouldNavigate, setShouldNavigate] = useState(false);
 
   // derived clip duration for simulating time-based stages
   const clipDurationInSeconds = currentJob?.endTime && currentJob?.startTime
@@ -30,20 +31,22 @@ function Processing() {
 
 
   useEffect(() => {
-    let interval;
-
     const poll = async () => {
       await fetchJobStatus();
     };
 
-    poll(); // initial call
+    poll();
 
-    interval = setInterval(poll, 2000);
-    setIntervalId(interval);
+    pollingIntervalRef.current = setInterval(poll, 2000);
 
     return () => {
-      clearInterval(interval);
+      clearInterval(pollingIntervalRef.current);
     };
+  }, [jobId, navigate]);
+
+  useEffect(() => {
+    hasNavigated.current = false;
+    setShouldNavigate(false);
   }, [jobId]);
 
   // Simulated smooth progress for stages based on video duration
@@ -84,7 +87,18 @@ function Processing() {
     return () => clearInterval(interval);
   }, [status, progress, currentJob]);
 
+  useEffect(() => {
+    if (shouldNavigate && !hasNavigated.current) {
+      console.log('Navigating to results page...');
+      hasNavigated.current = true;
+      clearInterval(pollingIntervalRef.current);
+      navigate(`/results/${jobId}`);
+    }
+  }, [shouldNavigate, navigate, jobId]);
+
   const fetchJobStatus = async () => {
+    if (hasNavigated.current) return;  // early exit if navigation happened
+
     try {
       const response = await getJobStatus(jobId);
       const normalizedStatus = (response.data.status || '').split(' ')[0].toLowerCase();
@@ -96,20 +110,19 @@ function Processing() {
       // Update context
       setCurrentJob(response.data);
       
-      // If processing is complete, navigate to results page
-      if (!hasNavigated.current && normalizedStatus === 'completed') {
-        hasNavigated.current = true;
-        navigate(`/results/${jobId}`);
+      if (normalizedStatus === 'completed') {
+        if (!shouldNavigate) {
+          setShouldNavigate(true);  // set once only
+        }
+        return;  // early return, avoid extra polling
       }
-
-      // If there's an error in processing
-      if (response.data.status === 'error') {
-        clearInterval(intervalId);
+      if (normalizedStatus === 'error') {
+        clearInterval(pollingIntervalRef.current);
         setError(response.data.error || 'An error occurred during processing');
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to get processing status');
-      clearInterval(intervalId);
+      clearInterval(pollingIntervalRef.current);  // STOP POLLING ON ERROR
     }
   };
 

@@ -19,6 +19,7 @@ function Results() {
   });
 
   useEffect(() => {
+    hasRedirected.current = false; // Reset on jobId change
     fetchJobData(); // Always fetch fresh job status
   }, [jobId]);
 
@@ -27,7 +28,21 @@ function Results() {
       setIsLoading(true);
       const response = await getJobStatus(jobId);
       
-      if (response.data.status !== 'completed' && !hasRedirected.current) {
+      const normalizedStatus = (response.data.status || '').trim().toLowerCase();
+
+      if (normalizedStatus !== 'completed' && !hasRedirected.current) {
+        hasRedirected.current = true;
+        navigate(`/processing/${jobId}`);
+        return;
+      }
+
+      if (normalizedStatus === 'error') {
+        setError(response.data.error || 'Processing error occurred.');
+        setIsLoading(false);
+        return;
+      }
+
+      if (normalizedStatus !== 'completed' && !hasRedirected.current) {
         hasRedirected.current = true;
         navigate(`/processing/${jobId}`);
         return;

@@ -159,6 +159,12 @@ exports.getJobResults = async (req, res) => {
     }
 
     const job = jobsStatus[jobId];
+
+    // Shape the fileUrls object for frontend
+    const fileUrls = {
+      pdf: job.pdfUrl ? `/api/files/${jobId}/pdf` : null,
+      markdown: job.markdownUrl ? `/api/files/${jobId}/markdown` : null
+    };
     
     if (job.status !== 'COMPLETED') {
       return res.status(200).json({
@@ -169,14 +175,8 @@ exports.getJobResults = async (req, res) => {
     }
 
     return res.status(200).json({
-      jobId,
-      status: job.status,
-      title: job.title,
-      transcription: job.transcription,
-      translation: job.translation,
-      pdfUrl: job.pdfUrl ? `/outputs/pdf/${path.basename(job.pdfUrl)}` : null,
-      markdownUrl: job.markdownUrl ? `/outputs/markdown/${path.basename(job.markdownUrl)}` : null,
-      completedAt: job.updatedAt
+      ...job,
+      fileUrls
     });
   } catch (error) {
     console.error('Error retrieving job results:', error);

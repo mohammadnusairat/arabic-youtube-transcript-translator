@@ -37,7 +37,7 @@ router.post('/upload', uploadMiddleware.single('audioFile'), async (req, res) =>
 });
 
 // Job status
-router.get('/status/:jobId', transcriptController.getJobStatus);
+router.get('/status/:jobId', transcriptController.getJobResults);
 router.post('/cancel/:jobId', transcriptController.cancelJob);
 router.get('/jobs/:jobId/results', transcriptController.getJobResults);
 router.get('/files/:jobId/:fileType', transcriptController.getFile);
