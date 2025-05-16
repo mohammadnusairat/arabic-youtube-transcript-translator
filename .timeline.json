@@ -1,5 +1,5 @@
 {
-  "timeline_index": 338,
+  "timeline_index": 341,
   "planner": {
     "Team Leader": {
       "1": {
@@ -415,7 +415,10 @@
     "335": 1,
     "336": 1,
     "337": 1,
-    "338": 1
+    "338": 1,
+    "339": 1,
+    "340": 1,
+    "341": 1
   },
   "preview_servers": {
     "7e98a76b-ad04-4c94-ade6-737038768161": {
@@ -429,5 +432,7 @@
       "logs": []
     }
   },
-  "deploy": {}
+  "deploy": {
+    "proj_name": "arabic-youtube-transcript-translator-1vsr6p"
+  }
 }
