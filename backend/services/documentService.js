@@ -1,9 +1,9 @@
 // services/documentService.js
 const fs = require('fs-extra');
 const path = require('path');
-const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
-const markdownpdf = require('markdown-pdf');
+const { PDFDocument, rgb } = require('pdf-lib');
 const { formatTimestamp } = require('./transcriptionService');
+const config = require('../config/config');
 
 /**
  * Generate a PDF document from transcription segments
@@ -15,76 +15,69 @@ const { formatTimestamp } = require('./transcriptionService');
 exports.generatePDF = async (segments, title, outputPath) => {
   try {
     console.log(`Generating PDF document to ${outputPath}`);
-    
-    // Create a new PDF document
+
+    // Load a font that supports Arabic
+    const fontPath = path.join(config.baseDir, 'fonts', 'Amiri_Quran', 'AmiriQuran-Regular.ttf');
+    if (!fs.existsSync(fontPath)) {
+      throw new Error(`Font not found at: ${fontPath}`);
+    }
+    const fontBytes = fs.readFileSync(fontPath);
+
     const pdfDoc = await PDFDocument.create();
-    const timesRomanFont = await pdfDoc.embedFont(StandardFonts.TimesRoman);
-    const boldFont = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
-    
-    // Add a page
+    const arabicFont = await pdfDoc.embedFont(fontBytes);
+
     const page = pdfDoc.addPage();
     const { width, height } = page.getSize();
     const margin = 50;
     let yPosition = height - margin;
-    const lineHeight = 15;
-    
-    // Add title
+    const lineHeight = 20;
+
+    // Draw title
     page.drawText(title, {
       x: margin,
       y: yPosition,
       size: 18,
-      font: boldFont,
+      font: arabicFont,
       color: rgb(0, 0, 0)
     });
     yPosition -= lineHeight * 2;
-    
-    // Add timestamp and heading
+
+    // Subtitle
     page.drawText('English Transcript with Timestamps', {
       x: margin,
       y: yPosition,
       size: 14,
-      font: boldFont,
+      font: arabicFont,
       color: rgb(0, 0, 0)
     });
     yPosition -= lineHeight * 2;
-    
-    // Add each segment
+
     for (const segment of segments) {
       const timestamp = formatTimestamp(segment.start);
-      
-      // Add timestamp
-      page.drawText(`[${timestamp}]`, {
+
+      const text = `[${timestamp}] ${segment.text}`;
+
+      page.drawText(text, {
         x: margin,
         y: yPosition,
         size: 12,
-        font: boldFont,
-        color: rgb(0.3, 0.3, 0.7)
-      });
-      
-      // Add translation text
-      const text = segment.text;
-      page.drawText(text, {
-        x: margin + 70,
-        y: yPosition,
-        size: 12,
-        font: timesRomanFont,
+        font: arabicFont,
         color: rgb(0, 0, 0)
       });
-      
-      yPosition -= lineHeight * 1.5;
-      
-      // Add a new page if needed
+
+      yPosition -= lineHeight;
+
       if (yPosition < margin) {
         const newPage = pdfDoc.addPage();
+        page = newPage;
         yPosition = height - margin;
       }
     }
-    
-    // Save the PDF
+
     const pdfBytes = await pdfDoc.save();
     await fs.ensureDir(path.dirname(outputPath));
     await fs.writeFile(outputPath, pdfBytes);
-    
+
     console.log(`PDF document saved to ${outputPath}`);
     return outputPath;
   } catch (error) {

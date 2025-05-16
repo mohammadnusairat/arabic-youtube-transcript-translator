@@ -1,12 +1,19 @@
 // services/youtubeService.js
-const ytdlp = require('yt-dlp-exec');
 const fs = require('fs-extra');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
-const config = require('../config/config');
+const ytDlpExec = require('yt-dlp-exec');
+const ffmpeg = require('fluent-ffmpeg');
+const { FFMPEG_PATH } = require('../config/config');
 
-// Dynamic ffmpeg path support (for AWS or custom environments)
-const ffmpegPath = process.env.FFMPEG_PATH || 'ffmpeg';
+// Explicit path to yt-dlp binary
+//const ytDlpPath = process.env.YT_DLP_BINARY || path.join(__dirname, '..', 'node_modules', 'yt-dlp-exec', 'bin', 'yt-dlp.exe');
+
+// Create yt-dlp instance with custom binary path
+//const ytdlp = ytDlpExec.create({ binary: ytDlpPath }).exec;
+
+// Set path to ffmpeg binary
+ffmpeg.setFfmpegPath(FFMPEG_PATH);
 
 /**
  * Extract video ID from YouTube URL
@@ -35,47 +42,46 @@ exports.isValidYouTubeUrl = (url) => {
 /**
  * Download and extract audio using yt-dlp
  */
-exports.extractAudio = async (videoUrl, outputPath) => {
+exports.extractAudio = async (videoUrl, outputDir) => {
   try {
     console.log(`[YT-DLP] Fetching audio from: ${videoUrl}`);
 
-    // Ensure output directory exists
-    const outputDir = path.dirname(outputPath);
     await fs.ensureDir(outputDir);
 
-    // Use a temporary file name to avoid collisions
-    const tempOutput = path.join(outputDir, `${uuidv4()}.%(ext)s`);
+    const audioBase = uuidv4();
+    const outputTemplate = path.join(outputDir, `${audioBase}.%(ext)s`).replace(/\\/g, '/'); // ✅ convert Windows-style slashes to forward slashes
 
-    await ytdlp(videoUrl, {
+    const finalWav = path.join(outputDir, `${audioBase}.wav`);
+    await fs.ensureDir(path.dirname(outputTemplate)); // ✅ ensure the parent dir exists
+
+    // ✅ Step 1: Download MP3 using yt-dlp with correct output template
+    await ytDlpExec(videoUrl, {
       extractAudio: true,
       audioFormat: 'mp3',
       audioQuality: 0,
-      output: tempOutput,
+      output: outputTemplate, // ✅ Correct template
       noCheckCertificates: true,
       noWarnings: true,
       preferFreeFormats: true,
       addMetadata: true,
-      //ffmpegLocation: config.ffmpegPath || './bin/ffmpeg',
     });
 
-    // Find the resulting file
-    const downloadedFiles = await fs.readdir(outputDir);
-    const mp3File = downloadedFiles.find((file) => file.endsWith('.mp3'));
-    if (!mp3File) throw new Error('MP3 audio not found after yt-dlp extraction');
+    // ✅ Step 2: Convert to mono 16kHz WAV using ffmpeg
+    await new Promise((resolve, reject) => {
+      ffmpeg(path.join(outputDir, `${audioBase}.mp3`)) // 👈 THIS LINE GOES HERE
+        .audioChannels(1)
+        .audioFrequency(16000)
+        .format('wav')
+        .on('end', resolve)
+        .on('error', reject)
+        .save(finalWav);
+    });
 
-    const finalPath = path.join(outputDir, 'audio.mp3');
-    await fs.rename(path.join(outputDir, mp3File), finalPath);
-
-    console.log(`[YT-DLP] Audio downloaded to: ${finalPath}`);
-    return { filePath: finalPath };
+    console.log(`[FFMPEG] Audio converted to WAV: ${finalWav}`);
+    return { filePath: finalWav };
   } catch (err) {
-    if (err.message.includes('Unable to extract') || err.message.includes('signature')) {
-      console.error('[YT-DLP ERROR] Signature decryption failed. YouTube may have updated.');
-      throw new Error('Failed to download audio. The video may be protected or YouTube has changed.');
-    }
-
-    console.error('[YT-DLP ERROR]', err);
-    throw new Error('An error occurred while downloading audio. Please try a different video.');
+    console.error('[YT-DLP/FFMPEG ERROR]', err);
+    throw new Error('An error occurred while downloading or converting audio. Please try a different video.');
   }
 };
 
@@ -84,7 +90,7 @@ exports.extractAudio = async (videoUrl, outputPath) => {
  */
 exports.getVideoDetails = async (videoUrl) => {
   try {
-    const info = await ytdlp(videoUrl, {
+    const info = await ytDlpExec(videoUrl, {
       dumpJson: true,
       noWarnings: true,
     });
@@ -109,7 +115,7 @@ exports.getVideoDetails = async (videoUrl) => {
  */
 exports.checkVideoAvailability = async (url) => {
   try {
-    await ytdlp(url, {
+    await ytDlpExec(url, {
       skipDownload: true,
       quiet: true,
       simulate: true,

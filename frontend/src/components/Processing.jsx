@@ -39,7 +39,8 @@ function Processing() {
   const fetchJobStatus = async () => {
     try {
       const response = await getJobStatus(jobId);
-      setStatus(response.data.status);
+      const normalizedStatus = (response.data.status || '').split(' ')[0].toLowerCase();
+      setStatus(normalizedStatus);
       setProgress(response.data.progress || {});
       setVideoMetadata(response.data.videoMetadata || {});
       setEstimatedTime(response.data.estimatedTime);

@@ -36,11 +36,6 @@ const config = {
   outputDir,
   tempDir,
 
-  // Feature flags
-  useSimulation:
-    process.env.USE_SIMULATION === 'true' ||
-    (!process.env.OPENAI_API_KEY && !process.env.MARKITDOWN_API_KEY),
-
   // CORS
   cors: {
     origin: process.env.CORS_ORIGIN || '*',

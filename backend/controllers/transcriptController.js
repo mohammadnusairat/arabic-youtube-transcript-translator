@@ -176,12 +176,12 @@ async function processTranscriptionJob(jobId, youtubeUrl) {
   try {
     const videoId = youtubeService.extractVideoId(youtubeUrl);
     const timestamp = Date.now();
-    const outputFileName = `${videoId}_${timestamp}.mp3`;
-    const outputPath = path.join(config.tempDir, outputFileName);
+    const outputFolder = config.tempDir;
+    await fs.ensureDir(outputFolder);
 
     updateJobStatus(jobId, 'DOWNLOADING', 10, 'Downloading YouTube video audio');
 
-    const { filePath } = await youtubeService.extractAudio(youtubeUrl, outputPath);
+    const { filePath } = await youtubeService.extractAudio(youtubeUrl, outputFolder);
 
     if (!filePath || !fs.existsSync(filePath)) {
       throw new Error('Audio file missing after download.');
@@ -224,6 +224,8 @@ async function processTranscriptionJob(jobId, youtubeUrl) {
     ]);
 
     updateJobStatus(jobId, 'COMPLETED', 100, 'Transcription job completed successfully', {
+      transcription,
+      translation,
       pdfUrl: pdfPath,
       markdownUrl: markdownPath
     });
@@ -266,6 +268,8 @@ async function processUploadedFileJob(jobId, audioFilePath, title) {
     
     // Update job with completed status and file paths
     updateJobStatus(jobId, 'COMPLETED', 100, 'Transcription job completed successfully', {
+      transcription,
+      translation,
       pdfUrl: pdfPath,
       markdownUrl: markdownPath
     });
@@ -292,17 +296,42 @@ async function processUploadedFileJob(jobId, audioFilePath, title) {
 /**
  * Update job status
  */
-function updateJobStatus(jobId, status, progress, message = null, data = {}) {
+function updateJobStatus(jobId, status, progressValue, message = null, data = {}) {
   if (!jobsStatus[jobId]) return;
+
+  // Mapping backend stages to frontend keys
+  const stageToKey = {
+    'INITIATED': 'validating',
+    'DOWNLOADING': 'extracting',
+    'TRANSCRIBING': 'transcribing',
+    'TRANSLATING': 'translating',
+    'GENERATING_DOCUMENTS': 'generating'
+  };
+
+  const progressKey = stageToKey[status];
+  const existingProgress = jobsStatus[jobId].progress || {
+    validating: 0,
+    extracting: 0,
+    transcribing: 0,
+    translating: 0,
+    generating: 0,
+  };
+
+  const updatedProgress = { ...existingProgress };
+  if (progressKey) {
+    updatedProgress[progressKey] = progressValue;
+  }
+
   jobsStatus[jobId] = {
     ...jobsStatus[jobId],
     ...data,
     status,
-    progress,
     message,
+    progress: updatedProgress,
     updatedAt: new Date()
   };
-  console.log(`Job ${jobId} status updated to ${status} (${progress}%): ${message}`);
+
+  console.log(`Job ${jobId} status updated to ${status} (${progressValue}%): ${message}`);
 }
 
 /**
