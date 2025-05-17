@@ -1,8 +1,8 @@
 // src/utils/api.js
 import axios from 'axios';
 
-// Base URL for API calls (relative path ensures flexibility)
-const API_BASE_URL = '/api';
+// Use environment variable or fallback to relative path for local dev
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || '/api';
 
 // Create Axios instance
 const apiClient = axios.create({
