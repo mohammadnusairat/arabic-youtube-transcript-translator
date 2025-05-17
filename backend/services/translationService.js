@@ -10,7 +10,7 @@ if (config.openaiApiKey) {
   });
   console.log('OpenAI API initialized successfully');
 } else {
-  console.warn('OpenAI API key not provided, falling back to simulation');
+  console.warn('OpenAI API key not provided !!!');
 }
 
 /**
@@ -21,10 +21,6 @@ if (config.openaiApiKey) {
 exports.translateText = async (transcriptionSegments) => {
   try {
     console.log(`Starting translation for ${transcriptionSegments.length} segments`);
-
-    if (config.useSimulation) {
-      return simulateTranslation(transcriptionSegments);
-    }
     
     if (!openai) {
       throw new Error('OpenAI API key not configured');
@@ -85,39 +81,6 @@ ${batch.map((segment, index) => `${index + 1}. ${segment.text}`).join('\n')}`;
     return translatedSegments;
   } catch (error) {
     console.error('Translation error:', error);
-    if (config.useSimulation) {
-      return simulateTranslation(transcriptionSegments);
-    }
     throw new Error(`Failed to translate text: ${error.message}`);
   }
 };
-
-/**
- * Simulate a translation response for testing
- * @param {Array} transcriptionSegments - Transcription segments with timestamps
- * @returns {Array} - Simulated translation segments
- */
-function simulateTranslation(transcriptionSegments) {
-  console.log('Using simulated translation data');
-  
-  // Simulated translations for the Arabic segments
-  const simulatedTranslations = [
-    "Welcome to this educational video",
-    "Today we will talk about the importance of the Arabic language in the digital world",
-    "Arabic is considered one of the most widely spoken languages in the world",
-    "There are more than 422 million people who speak Arabic as a first language",
-    "In this video, we will learn how to use technology to support Arabic content",
-    "One of the most important recent developments in this field is speech recognition and machine translation systems",
-    "These systems have improved significantly in recent years thanks to artificial intelligence technologies",
-    "Now we can convert spoken Arabic into written text with high accuracy",
-    "We can also easily translate this text into other languages such as English",
-    "These technologies help spread Arabic content more widely and make it more accessible"
-  ];
-  
-  // Map the simulated translations to the original segments
-  return transcriptionSegments.map((segment, index) => ({
-    ...segment,
-    original: segment.text,
-    text: simulatedTranslations[index] || `Translation for segment ${index + 1}`
-  }));
-}
