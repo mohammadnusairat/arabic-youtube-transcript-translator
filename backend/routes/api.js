@@ -130,7 +130,7 @@ router.get('/metadata', (req, res) => {
     return res.status(400).json({ error: 'Missing or invalid YouTube URL' });
   }
 
-  const ytDlpPath = process.env.YT_DLP_BINARY || 'yt-dlp';
+  const ytDlpPath = process.env.YT_DLP_BINARY || '/usr/local/bin/yt-dlp';
 
   const ytProcess = spawn(ytDlpPath, ['--no-warnings', '--get-duration', url], { shell: false });
 
@@ -186,7 +186,7 @@ router.get('/which', (req, res) => {
 
 // Route to test yt-dlp version (basic command to confirm it's runnable)
 router.get('/yt-dlp-version', (req, res) => {
-  const ytDlpPath = process.env.YT_DLP_BINARY || 'yt-dlp';
+  const ytDlpPath = process.env.YT_DLP_BINARY || '/usr/local/bin/yt-dlp';
   const child = spawn(ytDlpPath, ['--version']);
 
   let output = '';

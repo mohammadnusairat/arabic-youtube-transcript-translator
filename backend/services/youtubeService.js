@@ -13,7 +13,7 @@ const ytDlpPath = isWindows
   ? (process.env.YT_DLP_BINARY_LOCAL || 'yt-dlp')
   : (process.env.YT_DLP_BINARY || 'yt-dlp');
 
-const ffmpegPath = process.env.FFMPEG_PATH || 'ffmpeg';  // fallback to 'ffmpeg' in PATH
+const ffmpegPath = process.env.FFMPEG_PATH || '/usr/bin/ffmpeg';  // fallback to 'ffmpeg' in PATH
 
 /**
  * Validate if URL is a YouTube link
