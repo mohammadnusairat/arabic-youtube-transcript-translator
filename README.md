@@ -12,7 +12,6 @@
             <td><a href="#APIs-Used-and-How-They-Are-Integrated">APIs Used and How They Are Integrated</a></td>
         </tr>
         <tr>
-            <td><a href="#directory-structure">Directory Structure</a></td>
             <td><a href="#setup-instructions">Setup Instructions</a></td>
             <td><a href="#how-to-use-the-app">How to Use the App</a></td>
             <td><a href="#deployment--production-notes">Deployment & Production Notes</a></td>
@@ -47,10 +46,10 @@ Arabic YouTube Transcript Translator is a full-stack web application designed to
 ![Landing Page Screenshot](screenshots/landing-page.png)  
 *Landing page for submitting YouTube URLs*
 
-![Processing Screenshot](docs/screenshots/processing.png)  
+![Processing Screenshot](screenshots/processing.png)  
 *Processing screen showing live job status*
 
-![Results Screenshot](docs/screenshots/results.png)  
+![Results Screenshot](screenshots/results.png)  
 *Results page displaying transcript and download options*
 
 ## Why This App?
@@ -104,32 +103,7 @@ This project utilizes several key APIs to enable the functionality of YouTube vi
 
 6. The backend generates Markdown and PDF documents using the MarkItDown API and PDF libraries.
 
-7. The frontend fetches job status, transcript previews, and provides download links for PDF and Markdown files.
-
-## Directory Structure
-/backend  
-/config  
-/controllers  
-/fonts  
-/middleware  
-/routes  
-/services  
-/temp # Temporary files during processing  
-/outputs # Generated markdown & PDF files  
-  
-/frontend  
-/src  
-/components  
-/contexts  
-/styles  
-/utils  
-main.jsx  
-App.jsx  
-package.json  
-tailwind.config.js  
-vite.config.js  
-  
-The backend handles transcription, translation, and file generation. The frontend manages user interaction, video URL input, and displaying transcription results.  
+7. The frontend fetches job status, transcript previews, and provides download links for PDF and Markdown files. 
 
 ## Setup Instructions
 
