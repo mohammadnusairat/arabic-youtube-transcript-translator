@@ -8,6 +8,7 @@ obj/
 *.exe
 *.log
 logs/
+backend/.env
 .env
 .env.local
 .env.production
