@@ -127,7 +127,6 @@ function Home() {
         <p className="text-gray-600">
           Paste any Arabic YouTube video link to get an accurate English transcript with timestamps
         </p>
-        <div>Backend URL: {import.meta.env.VITE_BACKEND_URL}</div>
       </div>
 
       <div className="bg-white rounded-lg shadow-md p-6 mb-8">

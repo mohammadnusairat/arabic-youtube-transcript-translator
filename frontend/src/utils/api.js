@@ -60,7 +60,9 @@ export const getFile = (jobId, fileType, preview = false) =>
  */
 export const getVideoMetadata = async (jobId) => {
   try {
-    const response = await apiClient.get(`/metadata/${jobId}`);
+    const response = await apiClient.get('/metadata', {
+      params: { url: jobId }  // assuming jobId is actually the YouTube URL here
+    });
     return response.data.videoMetadata || {};
   } catch (error) {
     console.error('Failed to fetch video metadata:', error);
