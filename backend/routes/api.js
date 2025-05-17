@@ -5,7 +5,7 @@ const transcriptController = require('../controllers/transcriptController');
 const uploadMiddleware = require('../middleware/uploadMiddleware');
 const youtubeService = require('../services/youtubeService');
 const youtubeUrlExtractor = require('../middleware/youtubeUrlExtractor');
-const { exec } = require('child_process');
+const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
@@ -83,27 +83,73 @@ router.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
-// GET /api/metadata?url=https://youtu.be/...
-router.get('/metadata', async (req, res) => {
+// // GET /api/metadata?url=https://youtu.be/...
+// router.get('/metadata', async (req, res) => {
+//   const url = req.query.url;
+//   if (!url || typeof url !== 'string') {
+//     return res.status(400).json({ error: 'Missing or invalid YouTube URL' });
+//   }
+
+//   const isWindows = process.platform === 'win32';
+
+//   const ytDlpPath = isWindows
+//     ? (process.env.YT_DLP_BINARY_LOCAL || 'yt-dlp')
+//     : (process.env.YT_DLP_BINARY || 'yt-dlp');
+
+//   exec(`"${ytDlpPath}" --no-warnings --get-duration "${url}"`, (err, stdout, stderr) => {
+//     if (err) {
+//       console.error('[yt-dlp error]', err.message);
+//       console.error('stderr:', stderr);
+//       console.error('stdout:', stdout);
+//       return res.status(500).json({ error: 'Failed to get video duration' });
+//     }
+
+//     const raw = stdout.trim(); // e.g., 14:32 or 1:10:20
+//     const parts = raw.split(':').map(Number);
+//     let durationSeconds = 0;
+
+//     if (parts.length === 3) {
+//       durationSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+//     } else if (parts.length === 2) {
+//       durationSeconds = parts[0] * 60 + parts[1];
+//     } else if (parts.length === 1) {
+//       durationSeconds = parts[0];
+//     } else {
+//       return res.status(500).json({ error: 'Could not parse duration output' });
+//     }
+
+//     res.json({ durationSeconds });
+//   });
+// });
+
+router.get('/metadata', (req, res) => {
   const url = req.query.url;
   if (!url || typeof url !== 'string') {
     return res.status(400).json({ error: 'Missing or invalid YouTube URL' });
   }
 
-  const isWindows = process.platform === 'win32';
+  const ytDlpPath = process.env.YT_DLP_BINARY || 'yt-dlp';
 
-  const ytDlpPath = isWindows
-    ? (process.env.YT_DLP_BINARY_LOCAL || 'yt-dlp')
-    : (process.env.YT_DLP_BINARY || 'yt-dlp');
+  const ytProcess = spawn(ytDlpPath, ['--no-warnings', '--get-duration', url], { shell: false });
 
+  let output = '';
+  let errorOutput = '';
 
-  exec(`"${ytDlpPath}" --no-warnings --get-duration "${url}"`, (err, stdout, stderr) => {
-    if (err) {
-      console.error('[yt-dlp error]', stderr || err.message);
+  ytProcess.stdout.on('data', (data) => {
+    output += data.toString();
+  });
+
+  ytProcess.stderr.on('data', (data) => {
+    errorOutput += data.toString();
+  });
+
+  ytProcess.on('close', (code) => {
+    if (code !== 0) {
+      console.error('[yt-dlp spawn error]', errorOutput.trim());
       return res.status(500).json({ error: 'Failed to get video duration' });
     }
 
-    const raw = stdout.trim(); // e.g., 14:32 or 1:10:20
+    const raw = output.trim(); // e.g., "14:32" or "1:10:20"
     const parts = raw.split(':').map(Number);
     let durationSeconds = 0;
 
@@ -119,7 +165,33 @@ router.get('/metadata', async (req, res) => {
 
     res.json({ durationSeconds });
   });
+
+  ytProcess.on('error', (err) => {
+    console.error('[yt-dlp spawn error]', err.message);
+    res.status(500).json({ error: 'Failed to get video duration' });
+  });
 });
+
+// router.get('/which', (req, res) => {
+//   exec('which yt-dlp', (err, stdout, stderr) => {
+//     if (err) {
+//       console.error('which error:', err.message);
+//       return res.status(500).json({ error: 'yt-dlp not found' });
+//     }
+//     res.json({ path: stdout.trim() });
+//   });
+// });
+
+// router.get('/test-yt-dlp', (req, res) => {
+//   exec('yt-dlp --get-duration https://youtu.be/dQw4w9WgXcQ', (err, stdout, stderr) => {
+//     if (err) {
+//       console.error('[test yt-dlp error]', err.message);
+//       console.error('stderr:', stderr);
+//       return res.status(500).json({ error: 'yt-dlp test failed' });
+//     }
+//     res.json({ duration: stdout.trim() });
+//   });
+// });
 
 // Get metadata for a completed job
 router.get('/metadata/:jobId', async (req, res) => {
