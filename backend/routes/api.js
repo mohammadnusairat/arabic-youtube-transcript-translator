@@ -9,6 +9,8 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
+const { exec } = require('child_process');
+
 // POST YouTube URL for transcription
 router.post(
   '/transcribe',
@@ -172,26 +174,38 @@ router.get('/metadata', (req, res) => {
   });
 });
 
-// router.get('/which', (req, res) => {
-//   exec('which yt-dlp', (err, stdout, stderr) => {
-//     if (err) {
-//       console.error('which error:', err.message);
-//       return res.status(500).json({ error: 'yt-dlp not found' });
-//     }
-//     res.json({ path: stdout.trim() });
-//   });
-// });
+// Route to check where yt-dlp and ffmpeg are located
+router.get('/api/which', (req, res) => {
+  exec('which yt-dlp && which ffmpeg', (err, stdout, stderr) => {
+    if (err) {
+      return res.status(500).json({ error: 'Binary not found', details: stderr });
+    }
+    res.json({ paths: stdout.trim().split('\n') });
+  });
+});
 
-// router.get('/test-yt-dlp', (req, res) => {
-//   exec('yt-dlp --get-duration https://youtu.be/dQw4w9WgXcQ', (err, stdout, stderr) => {
-//     if (err) {
-//       console.error('[test yt-dlp error]', err.message);
-//       console.error('stderr:', stderr);
-//       return res.status(500).json({ error: 'yt-dlp test failed' });
-//     }
-//     res.json({ duration: stdout.trim() });
-//   });
-// });
+// Route to test yt-dlp version (basic command to confirm it's runnable)
+router.get('/api/yt-dlp-version', (req, res) => {
+  const ytDlpPath = process.env.YT_DLP_BINARY || 'yt-dlp';
+  const child = spawn(ytDlpPath, ['--version']);
+
+  let output = '';
+  let errorOutput = '';
+
+  child.stdout.on('data', (data) => output += data.toString());
+  child.stderr.on('data', (data) => errorOutput += data.toString());
+
+  child.on('close', (code) => {
+    if (code !== 0) {
+      return res.status(500).json({ error: 'yt-dlp version check failed', details: errorOutput.trim() });
+    }
+    res.json({ version: output.trim() });
+  });
+
+  child.on('error', (err) => {
+    res.status(500).json({ error: 'yt-dlp spawn error', details: err.message });
+  });
+});
 
 // Get metadata for a completed job
 router.get('/metadata/:jobId', async (req, res) => {
