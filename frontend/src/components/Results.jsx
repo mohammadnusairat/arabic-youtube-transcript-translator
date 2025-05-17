@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getJobStatus, getFile } from '../utils/api';
+import { getJobStatus, getFile, getVideoMetadata } from '../utils/api';
 import { useJobContext } from '../contexts/JobContext';
 
 function Results() {
@@ -49,7 +49,12 @@ function Results() {
       }
       
       setCurrentJob(response.data);
-      setVideoMetadata(response.data.videoMetadata || {});
+      const metadata = await getVideoMetadata(jobId);
+      if (metadata && typeof metadata === 'object') {
+        setVideoMetadata(metadata);
+      } else {
+        console.warn('Video metadata was not available or malformed');
+      }
       setFileUrls(response.data.fileUrls || {});
       
       await fetchTranscriptPreview();
@@ -62,8 +67,8 @@ function Results() {
 
   const fetchTranscriptPreview = async () => {
     try {
-      const response = await getFile(jobId, 'markdown', true);  // true for preview mode
-      setTranscriptPreview(response.data.preview || '');
+      const response = await getFile(jobId, 'markdown', false);  // true for preview small amount of text, false for full text
+      setTranscriptPreview(response.data); // because responseType is now 'text'
     } catch (err) {
       console.error('Failed to load transcript preview:', err);
       setTranscriptPreview('Preview not available.');
@@ -135,7 +140,8 @@ function Results() {
       <div className="bg-white rounded-lg shadow-md p-6 mb-8">
         <h1 className="text-2xl font-bold text-gray-800 mb-6">Transcript Results</h1>
         
-        {videoMetadata && (
+        {/* THE BELOW FEATURES ARE NOT YET WORKING !!! */}
+        {/* {videoMetadata && (
           <div className="flex items-center mb-6">
             {videoMetadata.thumbnail && (
               <img 
@@ -145,7 +151,7 @@ function Results() {
               />
             )}
             <div>
-              <h2 className="text-lg font-semibold text-gray-800">{videoMetadata.title || 'Video'}</h2>
+              <h2 className="text-lg font-semibold text-gray-800">{videoMetadata.title || ''}</h2>
               {videoMetadata.channelTitle && (
                 <p className="text-gray-600">
                   {videoMetadata.channelTitle} | Duration: {videoMetadata.duration || '--:--'}
@@ -153,7 +159,7 @@ function Results() {
               )}
             </div>
           </div>
-        )}
+        )} */}
         
         <div className="mb-6">
           <h3 className="text-lg font-semibold text-gray-800 mb-3">Transcript Preview:</h3>

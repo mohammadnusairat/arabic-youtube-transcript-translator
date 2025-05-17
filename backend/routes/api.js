@@ -7,6 +7,7 @@ const youtubeService = require('../services/youtubeService');
 const youtubeUrlExtractor = require('../middleware/youtubeUrlExtractor');
 const { exec } = require('child_process');
 const path = require('path');
+const fs = require('fs');
 
 // POST YouTube URL for transcription
 router.post(
@@ -115,6 +116,31 @@ router.get('/metadata', async (req, res) => {
 
     res.json({ durationSeconds });
   });
+});
+
+// Get metadata for a completed job
+router.get('/metadata/:jobId', async (req, res) => {
+  const { jobId } = req.params;
+
+  const tempDir = path.join(__dirname, '../temp/jobs'); // or wherever you're storing job metadata
+  const metaPath = path.join(tempDir, `${jobId}.json`);
+
+  if (!fs.existsSync(metaPath)) {
+    return res.status(404).json({ error: 'Job metadata file not found' });
+  }
+
+  try {
+    const jobMeta = JSON.parse(await fs.promises.readFile(metaPath, 'utf-8'));
+    const videoUrl = jobMeta.url;
+
+    if (!videoUrl) return res.status(400).json({ error: 'No video URL in job metadata' });
+
+    const videoMetadata = await youtubeService.getFullMetadata(videoUrl);
+    res.json({ videoMetadata });
+  } catch (err) {
+    console.error('[Metadata Fetch Error]', err.message);
+    res.status(500).json({ error: 'Failed to retrieve metadata' });
+  }
 });
 
 module.exports = router;

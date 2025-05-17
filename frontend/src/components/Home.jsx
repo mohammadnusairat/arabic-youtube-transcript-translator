@@ -18,6 +18,7 @@ function Home() {
   const [recentJobs, setRecentJobs] = useState([]);
   const navigate = useNavigate();
   const { setCurrentJob } = useJobContext();
+  const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
 
   useEffect(() => {
     // Load recent jobs from localStorage
@@ -33,7 +34,9 @@ function Home() {
 
   const fetchMetadata = async () => {
     setError('');
+    setIsFetchingMetadata(true);
     if (!validateYoutubeUrl(url)) {
+      setIsFetchingMetadata(false);
       return setError('Please enter a valid YouTube URL');
     }
 
@@ -42,6 +45,8 @@ function Home() {
       setVideoDuration(response.data.durationSeconds);
     } catch (err) {
       setError('Failed to fetch video metadata');
+    } finally {
+      setIsFetchingMetadata(false);
     }
   };
 
@@ -71,6 +76,7 @@ function Home() {
     if (!videoDuration) return setError('Please fetch video metadata first');
     if (start >= end) return setError('Start time must be less than end time');
     if (end > videoDuration) return setError('End time exceeds video duration');
+    if ((end - start) < 5) return setError('Please select at least 5 seconds of audio');
     
     setIsLoading(true);
     console.log('Submitting validated URL:', trimmedUrl);
@@ -100,7 +106,11 @@ function Home() {
       localStorage.setItem('recentJobs', JSON.stringify(updatedJobs));
       
       // Navigate to processing page
-      navigate(`/processing/${response.data.jobId}`);
+      navigate(`/processing/${response.data.jobId}`, {
+        state: {
+          clipDuration: end - start // already in seconds
+        }
+      });
     } catch (err) {
       setError(err.response?.data?.message || 'An error occurred. Please try again.');
     } finally {
@@ -140,14 +150,16 @@ function Home() {
             <button
               type="button"
               onClick={fetchMetadata}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md"
-              disabled={isLoading}
+              className={`px-4 py-2 rounded-md text-white ${
+                isFetchingMetadata ? 'bg-gray-400 cursor-wait' : 'bg-indigo-600 hover:bg-indigo-700'
+              }`}
+              disabled={isLoading || isFetchingMetadata}
             >
-              Fetch Video Duration
+              {isFetchingMetadata ? 'Fetching...' : 'Fetch Video Metadata'}
             </button>
             {videoDuration && (
               <p className="text-sm text-green-600 mt-2">
-                Video Duration: {videoDuration} seconds
+                Video Duration: {Math.floor(videoDuration / 60)}m {videoDuration % 60}s
               </p>
             )}
           </div>
@@ -160,14 +172,22 @@ function Home() {
                   type="number"
                   placeholder="Min"
                   value={startMinutes}
-                  onChange={(e) => setStartMinutes(e.target.value)}
+                  onChange={(e) => {
+                    const value = Math.max(0, parseInt(e.target.value) || 0);
+                    setStartMinutes(value.toString());
+                  }}
                   className="w-1/2 p-2 border border-gray-300 rounded-md"
                 />
                 <input
                   type="number"
                   placeholder="Sec"
                   value={startSeconds}
-                  onChange={(e) => setStartSeconds(e.target.value)}
+                  onChange={(e) => {
+                    let value = parseInt(e.target.value) || 0;
+                    if (value < 0) value = 0;
+                    if (value > 59) value = 59;
+                    setStartSeconds(value.toString());
+                  }}
                   className="w-1/2 p-2 border border-gray-300 rounded-md"
                 />
               </div>
@@ -180,14 +200,22 @@ function Home() {
                   type="number"
                   placeholder="Min"
                   value={endMinutes}
-                  onChange={(e) => setEndMinutes(e.target.value)}
+                  onChange={(e) => {
+                    const value = Math.max(0, parseInt(e.target.value) || 0);
+                    setEndMinutes(value.toString());
+                  }}
                   className="w-1/2 p-2 border border-gray-300 rounded-md"
                 />
                 <input
                   type="number"
                   placeholder="Sec"
                   value={endSeconds}
-                  onChange={(e) => setEndSeconds(e.target.value)}
+                  onChange={(e) => {
+                    let value = parseInt(e.target.value) || 0;
+                    if (value < 0) value = 0;
+                    if (value > 59) value = 59;
+                    setEndSeconds(value.toString());
+                  }}
                   className="w-1/2 p-2 border border-gray-300 rounded-md"
                 />
               </div>

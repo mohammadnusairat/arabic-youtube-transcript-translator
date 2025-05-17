@@ -2,33 +2,29 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getJobStatus, cancelJob } from '../utils/api';
 import { useJobContext } from '../contexts/JobContext';
+import { useLocation } from 'react-router-dom';
 
 function Processing() {
   const { jobId } = useParams();
   const navigate = useNavigate();
   const hasNavigated = useRef(false);
   const { currentJob, setCurrentJob } = useJobContext();
-  
   const [status, setStatus] = useState('');
   const [progress, setProgress] = useState({});
   const [error, setError] = useState('');
   const [videoMetadata, setVideoMetadata] = useState({});
-  const [estimatedTime, setEstimatedTime] = useState('');
-  const [remainingTime, setRemainingTime] = useState(null);
   const pollingIntervalRef = useRef(null);
   const [shouldNavigate, setShouldNavigate] = useState(false);
-
-  // derived clip duration for simulating time-based stages
-  const clipDurationInSeconds = currentJob?.endTime && currentJob?.startTime
-    ? currentJob.endTime - currentJob.startTime
-    : 60; // default fallback if not yet loaded
-
-  const STAGE_DURATIONS = {
-    transcribing: 0.4 * clipDurationInSeconds * 1000,
-    translating: 0.3 * clipDurationInSeconds * 1000,
-    generating_documents: 0.3 * clipDurationInSeconds * 1000
+  const location = useLocation();
+  const clipDuration = location.state?.clipDuration; // in seconds
+  
+  const getClipDurationLabel = (seconds) => {
+  if (!seconds || seconds <= 0) return null;
+    const min = Math.floor(seconds / 60) + 1;
+    return `${min}mins`;
   };
 
+  const clipDurationLabel = getClipDurationLabel(clipDuration);
 
   useEffect(() => {
     const poll = async () => {
@@ -49,44 +45,6 @@ function Processing() {
     setShouldNavigate(false);
   }, [jobId]);
 
-  // Simulated smooth progress for stages based on video duration
-  useEffect(() => {
-    let interval;
-    const stage = status;
-
-    if (!['transcribing', 'translating', 'generating_documents'].includes(stage)) return;
-
-    const targetDuration = STAGE_DURATIONS[stage]; // in ms
-    const incrementInterval = 1000; // 1s
-    const totalSteps = Math.floor(targetDuration / incrementInterval);
-    let currentStep = Math.floor((progress[stage] || 0) / (100 / totalSteps));
-    let remainingMs = targetDuration - (currentStep * incrementInterval);
-
-    interval = setInterval(() => {
-      currentStep++;
-      const simulatedProgress = Math.min(100, (currentStep / totalSteps) * 100);
-
-      // Update progress
-      setProgress(prev => ({
-        ...prev,
-        [stage]: simulatedProgress
-      }));
-
-      // Update remaining time
-      remainingMs = Math.max(0, remainingMs - incrementInterval);
-      const minutes = Math.floor(remainingMs / 60000);
-      const seconds = Math.floor((remainingMs % 60000) / 1000);
-      setRemainingTime(`${minutes}m ${seconds < 10 ? '0' : ''}${seconds}s`);
-
-      if (simulatedProgress >= 100) {
-        clearInterval(interval);
-        setRemainingTime(null);
-      }
-    }, incrementInterval);
-
-    return () => clearInterval(interval);
-  }, [status, progress, currentJob]);
-
   useEffect(() => {
     if (shouldNavigate && !hasNavigated.current) {
       console.log('Navigating to results page...');
@@ -105,8 +63,7 @@ function Processing() {
       setStatus(normalizedStatus);
       setProgress(response.data.progress || {});
       setVideoMetadata(response.data.videoMetadata || {});
-      setEstimatedTime(response.data.estimatedTime);
-      
+
       // Update context
       setCurrentJob(response.data);
       
@@ -371,21 +328,21 @@ function Processing() {
           </div>
         </div>
         
-        {estimatedTime && (
-          <div className="mb-6 text-center">
-            <p className="text-gray-600">
-              Estimated completion time: {estimatedTime}
-            </p>
+        {clipDurationLabel && (
+          <div className="mb-6 flex justify-center">
+            <span className="inline-block bg-gray-100 text-gray-700 text-sm px-3 py-1 rounded-full">
+              Estimated completion time: <strong>{clipDurationLabel}</strong>
+            </span>
           </div>
         )}
 
-        {remainingTime && (
+        {/* {remainingTime && (
           <div className="mb-6 text-center">
             <p className="text-sm text-gray-500">
               ⏳ Time remaining for {status.replace('_', ' ')}: {remainingTime}
             </p>
           </div>
-        )}
+        )} */}
         
         <div className="flex justify-center">
           <button

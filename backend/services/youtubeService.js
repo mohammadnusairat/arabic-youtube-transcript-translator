@@ -114,3 +114,38 @@ exports.getVideoDetails = async (youtubeUrl) => {
     duration: 0
   };
 };
+
+/**
+ * Get full video metadata (title, duration, uploader, thumbnail) using yt-dlp
+ */
+exports.getFullMetadata = (url) => {
+  return new Promise((resolve, reject) => {
+    const sanitizeUrl = sanitizeYouTubeUrl(url);
+    const ytCommand = "C:\\Users\\mnusa\\AppData\\Roaming\\Python\\Python313\\Scripts\\yt-dlp.exe";
+
+    const runCommand = (arg) => new Promise((resolveOne, rejectOne) => {
+      const proc = spawn(ytCommand, [arg, sanitizeUrl], { shell: true });
+
+      let out = '';
+      proc.stdout.on('data', (data) => out += data.toString());
+      proc.stderr.on('data', (data) => console.error(`[yt-dlp][${arg}]`, data.toString()));
+
+      proc.on('error', rejectOne);
+      proc.on('close', (code) => {
+        if (code !== 0) return rejectOne(new Error(`yt-dlp exited with code ${code} for ${arg}`));
+        resolveOne(out.trim());
+      });
+    });
+
+    Promise.all([
+      runCommand('--get-title'),
+      runCommand('--get-duration'),
+      runCommand('--get-uploader'),
+      runCommand('--get-thumbnail')
+    ])
+    .then(([title, duration, channelTitle, thumbnail]) => {
+      resolve({ title, duration, channelTitle, thumbnail });
+    })
+    .catch(reject);
+  });
+};

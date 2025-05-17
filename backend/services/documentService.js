@@ -115,10 +115,10 @@ exports.generateMarkdown = async (segments, title, outputPath, startTime = 0) =>
     
     // Add each segment
     for (const segment of segments) {
-      const adjustedStart = segment.start - startTime;
-      // const safeStart = adjustedStart < 0 ? 0 : adjustedStart;
-      const timestamp = formatTimestamp(adjustedStart);
-      markdown += `**[${timestamp}]** ${segment.text}\n\n`;
+      const start = (segment.start + startTime).toFixed(1);
+      const end = (segment.end + startTime).toFixed(1);
+      const timestamp = `[${start}s - ${end}s]`;
+      markdown += `**${timestamp}** ${segment.text}\n\n`;
     }
     
     // Save the markdown file

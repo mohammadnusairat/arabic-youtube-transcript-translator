@@ -45,6 +45,25 @@ export const cancelJob = (jobId) => apiClient.post(`/cancel/${jobId}`);
  * Get a file (PDF or Markdown)
  */
 export const getFile = (jobId, fileType, preview = false) =>
-  apiClient.get(`/files/${jobId}/${fileType}${preview ? '?preview=true' : ''}`, {
-    responseType: preview ? 'json' : 'blob',
+  apiClient.get(`/files/${jobId}/${fileType}`, {
+    params: preview ? { preview: true } : {},
+    responseType:
+      fileType === 'pdf'
+        ? 'blob'
+        : 'text', // ✅ return full Markdown as plain text
   });
+
+  /**
+ * Get video metadata for a completed job
+ * @param {string} jobId
+ * @returns {Promise<Object>} - Video metadata object
+ */
+export const getVideoMetadata = async (jobId) => {
+  try {
+    const response = await apiClient.get(`/metadata/${jobId}`);
+    return response.data.videoMetadata || {};
+  } catch (error) {
+    console.error('Failed to fetch video metadata:', error);
+    return {};
+  }
+};

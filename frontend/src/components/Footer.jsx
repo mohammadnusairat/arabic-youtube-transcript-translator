@@ -11,7 +11,7 @@ function Footer() {
           <div className="flex space-x-4">
             <a href="#" className="text-sm hover:text-blue-300 transition-colors duration-300">Terms of Service</a>
             <a href="#" className="text-sm hover:text-blue-300 transition-colors duration-300">Privacy Policy</a>
-            <a href="#" className="text-sm hover:text-blue-300 transition-colors duration-300">Contact</a>
+            <a href="https://www.mohammadnusairat.com/" className="text-sm hover:text-blue-300 transition-colors duration-300">Contact</a>
           </div>
         </div>
       </div>
