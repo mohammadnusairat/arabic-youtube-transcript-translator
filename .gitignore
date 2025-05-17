@@ -1,53 +1,70 @@
+# Node modules and build outputs
 node_modules/
 dist/
 build/
 out/
-bin/
-obj/
-*.o
-*.exe
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs
 *.log
 logs/
-backend/.env
+npm-debug.log
+yarn-error.log
+
+# Environment files (keep .env.production if you want to track it!)
 .env
 .env.local
-.env.production
 .env.development
 env/
-venv/
-ENV/
-.DS_Store
+backend/.env
+
+# IDE and Editor configs
 .idea/
 *.iml
 .vscode/
 .vscode/extensions.json
+*.code-workspace
+
+# Temporary and cache files
 .temp/
 *.tmp
+.sass-cache/
+.vite_opt_cache/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Build artifacts and temp objects
+bin/
+obj/
+*.o
+*.exe
+
+# Coverage and test results
 coverage/
-CMakeFiles/
-CMakeCache.txt
-yarn-error.log
-npm-debug.log
+*.coverage
+*.lcov
+test-results/
+
+# Backup and swap files
 *~
 *.bak
 *.swp
-Thumbs.db
-ehthumbs.db
-Desktop.ini
+*.sw?
+
+# Visual Studio and other IDEs
 *.local
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
-*.sw?
-.sass-cache/
-.vite_opt_cache/
-test-results/
-*.coverage
-*.lcov
-*.user
-*.code-workspace
-pnpm-lock.yaml
-*.pyc
-__pycache__
+
+# Miscellaneous
 IMPORTANT_KEYS.txt
+pnpm-lock.yaml
