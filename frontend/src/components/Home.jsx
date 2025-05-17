@@ -20,6 +20,15 @@ function Home() {
   const { setCurrentJob } = useJobContext();
   const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
 
+  const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || '/api';
+
+  const apiClient = axios.create({
+    baseURL: API_BASE_URL,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
   useEffect(() => {
     // Load recent jobs from localStorage
     const savedJobs = localStorage.getItem('recentJobs');
@@ -41,7 +50,7 @@ function Home() {
     }
 
     try {
-      const response = await axios.get('/api/metadata', { params: { url } });
+      const response = await apiClient.get('/metadata', { params: { url } });
       setVideoDuration(response.data.durationSeconds);
     } catch (err) {
       setError('Failed to fetch video metadata');
@@ -83,7 +92,7 @@ function Home() {
     
     try {
       console.log('About to call submitUrl with:', trimmedUrl);
-      const response = await axios.post('/api/transcribe', {
+      const response = await apiClient.post('/transcribe', {
         url: trimmedUrl,
         startTime: start,
         endTime: end
