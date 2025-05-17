@@ -49,6 +49,10 @@ const youtubeUrlExtractor = require('./middleware/youtubeUrlExtractor');
 // API Routes
 app.use('/api', apiRoutes);
 
+app.get('/', (req, res) => {
+  res.send('Backend is running! Use /api endpoints.');
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'Server is running' });
