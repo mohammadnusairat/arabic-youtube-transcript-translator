@@ -50,7 +50,7 @@ export const getFile = (jobId, fileType, preview = false) =>
     responseType:
       fileType === 'pdf'
         ? 'blob'
-        : 'text', // ✅ return full Markdown as plain text
+        : 'text', // return full Markdown as plain text
   });
 
   /**
