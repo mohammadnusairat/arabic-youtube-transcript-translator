@@ -10,6 +10,7 @@ const path = require('path');
 const fs = require('fs');
 
 const { exec } = require('child_process');
+const { url } = require('inspector');
 
 // POST YouTube URL for transcription
 router.post(
@@ -124,8 +125,18 @@ router.get('/health', (req, res) => {
 //   });
 // });
 
+/**
+ * Sanitize YouTube URL by removing 't' (start time) parameter and others that break shell commands
+ * @param {string} url 
+ * @returns {string} sanitized url
+ */
+function sanitizeYouTubeUrl(url) {
+  // Remove 't' parameter (?t= or &t= with optional seconds suffix)
+  return url.replace(/([&?])t=\d+s?/, '');
+}
+
 router.get('/metadata', (req, res) => {
-  const url = req.query.url;
+  const url = sanitizeYouTubeUrl(req.query.url);
   if (!url || typeof url !== 'string') {
     return res.status(400).json({ error: 'Missing or invalid YouTube URL' });
   }
@@ -146,6 +157,9 @@ router.get('/metadata', (req, res) => {
   });
 
   ytProcess.on('close', (code) => {
+    console.log(`[yt-dlp] exited with code ${code}`);
+    console.log(`[yt-dlp stdout] ${output.trim()}`);
+    console.log(`[yt-dlp stderr] ${errorOutput.trim()}`);
     if (code !== 0) {
       console.error('[yt-dlp spawn error]', errorOutput.trim());
       return res.status(500).json({ error: 'Failed to get video duration' });
