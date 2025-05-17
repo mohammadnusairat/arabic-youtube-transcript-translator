@@ -4,9 +4,14 @@ const path = require('path');
 const sdk = require('microsoft-cognitiveservices-speech-sdk');
 const config = require('../config/config');
 const ffmpeg = require('fluent-ffmpeg');
-const ffmpegPath = require('ffmpeg-static');
 
-// ffmpeg.setFfmpegPath(ffmpegPath);
+const ffmpegPathEnv = process.env.FFMPEG_PATH || null;
+if (ffmpegPathEnv) {
+  ffmpeg.setFfmpegPath(ffmpegPathEnv);
+} else {
+  // If no env, fluent-ffmpeg will use ffmpeg in PATH or ffmpeg-static
+  // ffmpegPath from ffmpeg-static is imported but optional here
+}
 
 exports.transcribeAudio = async (audioFilePath) => {
   try {

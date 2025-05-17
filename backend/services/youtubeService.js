@@ -6,6 +6,15 @@ const fs = require('fs-extra');
 const { v4: uuidv4 } = require('uuid');
 const config = require('../config/config');
 
+const isWindows = process.platform === 'win32';
+
+// Prefer local explicit path on Windows, else fallback to env or default
+const ytDlpPath = isWindows
+  ? (process.env.YT_DLP_BINARY_LOCAL || 'yt-dlp')
+  : (process.env.YT_DLP_BINARY || 'yt-dlp');
+
+const ffmpegPath = process.env.FFMPEG_PATH || 'ffmpeg';  // fallback to 'ffmpeg' in PATH
+
 /**
  * Validate if URL is a YouTube link
  */
@@ -56,7 +65,7 @@ exports.extractAudio = async (url, jobId, options = {}) => {
     '--output', rawOutputPath
   ];
 
-  const ytCommand = "C:\\Users\\mnusa\\AppData\\Roaming\\Python\\Python313\\Scripts\\yt-dlp.exe";
+  const ytCommand = ytDlpPath;
 
   console.log('[YT-DLP COMMAND]', ytCommand, ytArgs.join(' '));
 
@@ -86,11 +95,11 @@ exports.extractAudio = async (url, jobId, options = {}) => {
     console.log('[FFMPEG COMMAND] ffmpeg', ffmpegArgs.join(' '));
 
     await new Promise((resolve, reject) => {
-      const ffmpeg = spawn('ffmpeg', ffmpegArgs);
+      const ffmpegProcess = spawn(ffmpegPath, ffmpegArgs);
 
-      ffmpeg.stderr.on('data', (data) => console.error('[FFMPEG STDERR]', data.toString()));
-      ffmpeg.on('error', (err) => reject(new Error(`ffmpeg failed: ${err.message}`)));
-      ffmpeg.on('exit', (code) => {
+      ffmpegProcess .stderr.on('data', (data) => console.error('[FFMPEG STDERR]', data.toString()));
+      ffmpegProcess .on('error', (err) => reject(new Error(`ffmpeg failed: ${err.message}`)));
+      ffmpegProcess .on('exit', (code) => {
         if (code !== 0) return reject(new Error(`ffmpeg exited with code ${code}`));
         resolve();
       });
@@ -121,7 +130,7 @@ exports.getVideoDetails = async (youtubeUrl) => {
 exports.getFullMetadata = (url) => {
   return new Promise((resolve, reject) => {
     const sanitizeUrl = sanitizeYouTubeUrl(url);
-    const ytCommand = "C:\\Users\\mnusa\\AppData\\Roaming\\Python\\Python313\\Scripts\\yt-dlp.exe";
+    const ytCommand = ytDlpPath;
 
     const runCommand = (arg) => new Promise((resolveOne, rejectOne) => {
       const proc = spawn(ytCommand, [arg, sanitizeUrl], { shell: true });
