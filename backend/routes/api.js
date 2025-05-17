@@ -90,9 +90,12 @@ router.get('/metadata', async (req, res) => {
     return res.status(400).json({ error: 'Missing or invalid YouTube URL' });
   }
 
-  const ytDlpPath = path.join(
-    'C:/Users/mnusa/AppData/Roaming/Python/Python313/Scripts/yt-dlp.exe'
-  );
+  const isWindows = process.platform === 'win32';
+
+  const ytDlpPath = isWindows
+    ? (process.env.YT_DLP_BINARY_LOCAL || 'yt-dlp')
+    : (process.env.YT_DLP_BINARY || 'yt-dlp');
+
 
   exec(`"${ytDlpPath}" --no-warnings --get-duration "${url}"`, (err, stdout, stderr) => {
     if (err) {

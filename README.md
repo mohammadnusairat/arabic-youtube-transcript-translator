@@ -30,6 +30,9 @@
 ## Introduction
 Arabic YouTube Transcript Translator is a full-stack web application designed to automatically transcribe Arabic YouTube videos, translate the transcripts into English, and generate downloadable Markdown and PDF files. This project was created because I and my friends run an Instagram page where we post video clips, and transcribing and translating Arabic audio videos manually was very time-consuming. This app streamlines the entire process to save us significant time and effort.
 
+## Try it Live !
+<td><a href="https://arabic-youtube-transcript-translator.vercel.app/">Live Application</a></td>
+
 ## Features
 - Extract audio from YouTube videos using yt-dlp  
 - Transcribe Arabic speech to text with Azure Speech SDK  
@@ -41,7 +44,7 @@ Arabic YouTube Transcript Translator is a full-stack web application designed to
 
 ## Screenshots
 
-![Landing Page Screenshot](docs/screenshots/landing-page.png)  
+![Landing Page Screenshot](screenshots/landing-page.png)  
 *Landing page for submitting YouTube URLs*
 
 ![Processing Screenshot](docs/screenshots/processing.png)  
@@ -169,9 +172,22 @@ The backend handles transcription, translation, and file generation. The fronten
 5. Download as PDF, Markdown, or copy to clipboard.
 
 ## Deployment & Production Notes
-- Ensure Azure Speech and OpenAI API keys are active and correctly configured.  
-- yt-dlp and FFmpeg must be installed and accessible in the backend environment.  
-- Frontend and backend can be deployed separately on platforms like Vercel (frontend) and Railway/Heroku (backend).
+
+This project uses a modern, scalable deployment approach combining cloud-native technologies to ensure reliability and efficiency:
+
+### Backend Deployment
+
+- **Platform:** [Railway](https://railway.app) — chosen for its simplicity in deploying Dockerized Node.js backends with native support for environment variables and scalable hosting.
+- **Containerization:** The backend is packaged with a **Dockerfile** that installs all native dependencies (`yt-dlp`, `ffmpeg`, Python 3) and Node.js packages, ensuring consistent behavior between local development and production.
+- **Environment Variables:** All sensitive keys (Azure Speech, OpenAI API, MarkItDown API) are securely injected via Railway’s environment variable management, eliminating the need to commit secrets.
+- **Why:** Docker allows full control over system dependencies needed for audio processing tools, and Railway abstracts server maintenance and scaling.
+
+### Frontend Deployment
+
+- **Platform:** [Vercel](https://vercel.com) — ideal for static frontend hosting with seamless integration for React (Vite) apps.
+- **Configuration:** The frontend is configured to use a build-time environment variable (`VITE_BACKEND_URL`) pointing to the Railway backend URL, allowing seamless communication between frontend and backend without CORS issues.
+- **Proxying:** Local development uses Vite’s proxy feature to forward API requests to the local backend, mimicking production behavior.
+- **Why:** Vercel offers fast global CDN, automatic HTTPS, and zero-config deployments which perfectly suit React SPAs.
 
 ## Future Improvements
 - Add multi-language support beyond Arabic-English.  
