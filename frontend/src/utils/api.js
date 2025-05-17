@@ -2,7 +2,12 @@
 import axios from 'axios';
 
 // Use environment variable or fallback to relative path for local dev
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || '/api';
+// const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL;
+
+if (!API_BASE_URL) {
+  throw new Error('VITE_BACKEND_URL environment variable is not defined!');
+}
 
 // Create Axios instance
 const apiClient = axios.create({
