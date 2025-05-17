@@ -175,7 +175,7 @@ router.get('/metadata', (req, res) => {
 });
 
 // Route to check where yt-dlp and ffmpeg are located
-router.get('/api/which', (req, res) => {
+router.get('/which', (req, res) => {
   exec('which yt-dlp && which ffmpeg', (err, stdout, stderr) => {
     if (err) {
       return res.status(500).json({ error: 'Binary not found', details: stderr });
@@ -185,7 +185,7 @@ router.get('/api/which', (req, res) => {
 });
 
 // Route to test yt-dlp version (basic command to confirm it's runnable)
-router.get('/api/yt-dlp-version', (req, res) => {
+router.get('/yt-dlp-version', (req, res) => {
   const ytDlpPath = process.env.YT_DLP_BINARY || 'yt-dlp';
   const child = spawn(ytDlpPath, ['--version']);
 
