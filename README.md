@@ -164,10 +164,12 @@ This project uses a modern, scalable deployment approach combining cloud-native 
 - **Why:** Vercel offers fast global CDN, automatic HTTPS, and zero-config deployments which perfectly suit React SPAs.
 
 ## Future Improvements
-- Add multi-language support beyond Arabic-English.  
+- Add multi-language support beyond Arabic-English. Most prominently Urdu.
 - User authentication and saved transcript history.  
 - Export subtitles (SRT, VTT).  
-- Real-time transcription and translation streaming.  
+- Real-time transcription and translation streaming.
+- Adjust timestamps to have mins secs format so it’s more legible than merely secs
+- Add support for any raw arabic video
 - Mobile responsiveness and UI polish.
 
 ## Feedback
