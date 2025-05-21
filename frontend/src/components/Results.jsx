@@ -55,7 +55,11 @@ function Results() {
       } else {
         console.warn('Video metadata was not available or malformed');
       }
-      setFileUrls(response.data.fileUrls || {});
+      setFileUrls({
+        pdf: response.data.fileUrls?.pdf || '',
+        markdown: response.data.fileUrls?.markdown || '',
+        srt: response.data.fileUrls?.srt || ''
+      });
       
       await fetchTranscriptPreview();
       setIsLoading(false);
@@ -201,6 +205,17 @@ function Results() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
               </svg>
               Download Markdown
+            </button>
+          )}
+          {fileUrls.srt && (
+            <button 
+              onClick={() => handleDownload('srt')}
+              className="bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-md transition-colors duration-300 flex items-center"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              Download SRT
             </button>
           )}
           <button 
