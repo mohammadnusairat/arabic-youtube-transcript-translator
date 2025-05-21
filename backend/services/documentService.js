@@ -76,7 +76,12 @@ exports.generatePDF = async (segments, title, outputPath, startTime = 0) => {
     // const safeStart = start < 0 ? 0 : start;
     // const safeEnd = end < 0 ? 0 : end;
 
-    const timestamp = `[${start.toFixed(1)}s - ${end.toFixed(1)}s]`;
+    const formatTime = (seconds) => {
+      const min = Math.floor(seconds / 60);
+      const sec = Math.floor(seconds % 60);
+      return `${min}:${sec.toString().padStart(2, '0')}`;
+    };
+    const timestamp = `[${formatTime(start)} - ${formatTime(end)}]`;
     const line = `${timestamp} ${segment.text}`;
     const lines = splitText(line, 90);
 
@@ -117,7 +122,12 @@ exports.generateMarkdown = async (segments, title, outputPath, startTime = 0) =>
     for (const segment of segments) {
       const start = (segment.start + startTime).toFixed(1);
       const end = (segment.end + startTime).toFixed(1);
-      const timestamp = `[${start}s - ${end}s]`;
+      const formatTime = (seconds) => {
+        const min = Math.floor(seconds / 60);
+        const sec = Math.floor(seconds % 60);
+        return `${min}:${sec.toString().padStart(2, '0')}`;
+      };
+      const timestamp = `[${formatTime(start)} - ${formatTime(end)}]`;
       markdown += `**${timestamp}** ${segment.text}\n\n`;
     }
     
@@ -160,5 +170,40 @@ exports.generateHtmlPreview = (segments, title, startTime = 0) => {
   } catch (error) {
     console.error('Error generating HTML preview:', error);
     return `<p>Error generating preview: ${error.message}</p>`;
+  }
+};
+
+/**
+ * Generate SRT file for transcript segments
+ * @param {Array} segments - Transcription segments with timestamps
+ * @param {string} title - Video title
+ * @param {string} outputPath - Path to save the SRT
+ * @param {number} startTime - start time offset in seconds (default 0)
+ * @returns {Promise<string>} - Path to the generated SRT file
+ */
+exports.generateSRT = async (segments, title, outputPath, startTime = 0) => {
+  try {
+    console.log(`Generating SRT to ${outputPath}`);
+
+    const formatTime = (seconds) => {
+      const date = new Date(0);
+      date.setSeconds(seconds);
+      return date.toISOString().substr(11, 8) + ',000'; // HH:MM:SS,000 format
+    };
+
+    const srtLines = segments.map((seg, index) => {
+      const start = formatTime(seg.start + startTime);
+      const end = formatTime(seg.end + startTime);
+      return `${index + 1}\n${start} --> ${end}\n${seg.text}\n`;
+    });
+
+    const srtContent = srtLines.join('\n');
+
+    await fs.outputFile(outputPath, srtContent);
+    console.log(`✅ SRT saved to ${outputPath}`);
+    return outputPath;
+  } catch (error) {
+    console.error('Error generating SRT:', error);
+    throw new Error(`Failed to generate SRT: ${error.message}`);
   }
 };

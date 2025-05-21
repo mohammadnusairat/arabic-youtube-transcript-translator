@@ -20,6 +20,7 @@ fs.ensureDirSync(uploadsDir);
 fs.ensureDirSync(outputsDir);
 fs.ensureDirSync(path.join(outputsDir, 'pdf'));
 fs.ensureDirSync(path.join(outputsDir, 'markdown'));
+fs.ensureDirSync(path.join(outputsDir, 'srt'));
 fs.ensureDirSync(path.join(uploadsDir, 'audio'));
 
 // Middleware

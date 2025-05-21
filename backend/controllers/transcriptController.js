@@ -66,6 +66,7 @@ exports.startTranscriptionJob = async (req, res) => {
       translation: null,
       pdfUrl: null,
       markdownUrl: null,
+      srtUrl: null,
       error: null,
       createdAt: new Date(),
       updatedAt: new Date()
@@ -114,6 +115,7 @@ exports.startUploadedFileJob = async (req, res, audioFilePath) => {
       translation: null,
       pdfUrl: null,
       markdownUrl: null,
+      srtUrl: null,
       error: null,
       createdAt: new Date(),
       updatedAt: new Date()
@@ -232,17 +234,20 @@ async function processTranscriptionJob(jobId, youtubeUrl, options = {}) {
 
     const pdfPath = path.join(config.outputDir, 'pdf', `${sanitizedTitle}_${timestamp}.pdf`);
     const markdownPath = path.join(config.outputDir, 'markdown', `${sanitizedTitle}_${timestamp}.md`);
+    const srtPath = path.join(config.outputDir, 'srt', `${sanitizedTitle}_${timestamp}.srt`);
 
     await Promise.all([
       documentService.generatePDF(translation, sanitizedTitle, pdfPath, options.startTime || 0),
-      documentService.generateMarkdown(translation, sanitizedTitle, markdownPath, options.startTime || 0)
+      documentService.generateMarkdown(translation, sanitizedTitle, markdownPath, options.startTime || 0),
+      documentService.generateSRT(translation, sanitizedTitle, srtPath, options.startTime || 0)
     ]);
 
     updateJobStatus(jobId, 'COMPLETED', 100, 'Transcription job completed successfully', {
       transcription,
       translation,
       pdfUrl: pdfPath,
-      markdownUrl: markdownPath
+      markdownUrl: markdownPath,
+      srtUrl: srtPath
     });
 
     await fs.remove(filePath);
@@ -440,6 +445,8 @@ exports.getFile = async (req, res) => {
       filePath = job.pdfUrl;
     } else if (fileType.toLowerCase() === 'markdown' || fileType.toLowerCase() === 'md') {
       filePath = job.markdownUrl;
+    } else if (fileType.toLowerCase() === 'srt') {
+      filePath = job.srtUrl;
     } else {
       return res.status(400).json({ error: 'Invalid file type. Must be pdf or markdown' });
     }
@@ -467,8 +474,10 @@ exports.getFile = async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename=${path.basename(filePath)}`);
     if (fileType.toLowerCase() === 'pdf') {
       res.setHeader('Content-Type', 'application/pdf');
-    } else {
+    } else if (fileType.toLowerCase() === 'markdown') {
       res.setHeader('Content-Type', 'text/markdown');
+    } else if (fileType.toLowerCase() === 'srt') {
+      res.setHeader('Content-Type', 'application/x-subrip');
     }
     
     const fileStream = fs.createReadStream(filePath);
