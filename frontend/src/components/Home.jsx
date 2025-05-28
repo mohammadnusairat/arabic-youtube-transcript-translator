@@ -53,7 +53,12 @@ function Home() {
       const response = await apiClient.get('/metadata', { params: { url } });
       setVideoDuration(response.data.durationSeconds);
     } catch (err) {
-      setError('Failed to fetch video metadata');
+      const message = err?.response?.data?.error;
+      if (message === 'video_restricted_cookie_required') {
+        setError('This video is restricted and cannot be processed. Try a different one.');
+      } else {
+        setError('Failed to fetch video metadata');
+      }
     } finally {
       setIsFetchingMetadata(false);
     }

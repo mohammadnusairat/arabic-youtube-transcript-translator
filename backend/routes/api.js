@@ -162,6 +162,13 @@ router.get('/metadata', (req, res) => {
     console.log(`[yt-dlp stderr] ${errorOutput.trim()}`);
     if (code !== 0) {
       console.error('[yt-dlp spawn error]', errorOutput.trim());
+
+      if (errorOutput.includes('This video is age-restricted') || 
+          errorOutput.includes('sign in to confirm your age') ||
+          errorOutput.includes('HTTP Error 403')) {
+        return res.status(403).json({ error: 'video_restricted_cookie_required' });
+      }
+
       return res.status(500).json({ error: 'Failed to get video duration' });
     }
 
