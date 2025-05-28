@@ -163,9 +163,19 @@ router.get('/metadata', (req, res) => {
     if (code !== 0) {
       console.error('[yt-dlp spawn error]', errorOutput.trim());
 
-      if (errorOutput.includes('This video is age-restricted') || 
-          errorOutput.includes('sign in to confirm your age') ||
-          errorOutput.includes('HTTP Error 403')) {
+      const restrictedIndicators = [
+        'This video is age-restricted',
+        'sign in to confirm your age',
+        'Sign in to confirm you’re not a bot',
+        'HTTP Error 403',
+        'cookies for the authentication'
+      ];
+
+      const isRestricted = restrictedIndicators.some((line) =>
+        errorOutput.toLowerCase().includes(line.toLowerCase())
+      );
+
+      if (isRestricted) {
         return res.status(403).json({ error: 'video_restricted_cookie_required' });
       }
 
