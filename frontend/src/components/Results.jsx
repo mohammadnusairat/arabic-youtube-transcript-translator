@@ -85,9 +85,9 @@ function Results() {
       
       // Create download link
       const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
+      const extension = fileType === 'pdf' ? 'pdf' : fileType === 'markdown' ? 'md' : fileType; // 👈 now handles 'srt'
       link.href = url;
-      link.setAttribute('download', `transcript.${fileType === 'pdf' ? 'pdf' : 'md'}`);
+      link.setAttribute('download', `transcript.${extension}`);
       document.body.appendChild(link);
       link.click();
       link.remove();
