@@ -163,6 +163,22 @@ This project uses a modern, scalable deployment approach combining cloud-native 
 - **Proxying:** Local development uses Vite’s proxy feature to forward API requests to the local backend, mimicking production behavior.
 - **Why:** Vercel offers fast global CDN, automatic HTTPS, and zero-config deployments which perfectly suit React SPAs.
 
+### Note on Restricted YouTube Videos
+
+Some YouTube videos may initially fail to load metadata due to cookie-based restrictions imposed by YouTube, such as age verification or bot detection. These restrictions often result in errors like:  
+`Sign in to confirm you’re not a bot. Use --cookies-from-browser or --cookies for the authentication.`  
+
+However, this behavior is **not consistent**. In many cases, YouTube may temporarily relax these restrictions based on factors like:
+
+- IP reputation of the backend server (e.g. Railway-hosted container)
+- Time of access or geographic routing
+- Removal of suspicious URL parameters (e.g. `&t=1s`)
+- YouTube backend updates or caching
+
+As a result, the same video may succeed after previously failing. The app handles this gracefully by detecting cookie-related failures and informing the user with a clear message.
+
+To ensure consistent support for restricted videos in the future, support for browser-based cookies (`cookies.txt`) with `yt-dlp` may be added.
+
 ## Future Improvements
 - Add multi-language support beyond Arabic-English. Most prominently Urdu.
 - User authentication and saved transcript history.  

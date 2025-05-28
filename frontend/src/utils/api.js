@@ -59,6 +59,9 @@ export const getFile = (jobId, fileType, preview = false) =>
  * @returns {Promise<Object>} - Video metadata object
  */
 export const getVideoMetadata = async (jobId) => {
+  // Disabled to avoid calling yt-dlp again
+  return {};
+  
   try {
     const response = await apiClient.get('/metadata', {
       params: { url: jobId }  // assuming jobId is actually the YouTube URL here

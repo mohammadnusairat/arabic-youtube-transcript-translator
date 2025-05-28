@@ -86,45 +86,6 @@ router.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
-// // GET /api/metadata?url=https://youtu.be/...
-// router.get('/metadata', async (req, res) => {
-//   const url = req.query.url;
-//   if (!url || typeof url !== 'string') {
-//     return res.status(400).json({ error: 'Missing or invalid YouTube URL' });
-//   }
-
-//   const isWindows = process.platform === 'win32';
-
-//   const ytDlpPath = isWindows
-//     ? (process.env.YT_DLP_BINARY_LOCAL || 'yt-dlp')
-//     : (process.env.YT_DLP_BINARY || 'yt-dlp');
-
-//   exec(`"${ytDlpPath}" --no-warnings --get-duration "${url}"`, (err, stdout, stderr) => {
-//     if (err) {
-//       console.error('[yt-dlp error]', err.message);
-//       console.error('stderr:', stderr);
-//       console.error('stdout:', stdout);
-//       return res.status(500).json({ error: 'Failed to get video duration' });
-//     }
-
-//     const raw = stdout.trim(); // e.g., 14:32 or 1:10:20
-//     const parts = raw.split(':').map(Number);
-//     let durationSeconds = 0;
-
-//     if (parts.length === 3) {
-//       durationSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
-//     } else if (parts.length === 2) {
-//       durationSeconds = parts[0] * 60 + parts[1];
-//     } else if (parts.length === 1) {
-//       durationSeconds = parts[0];
-//     } else {
-//       return res.status(500).json({ error: 'Could not parse duration output' });
-//     }
-
-//     res.json({ durationSeconds });
-//   });
-// });
-
 /**
  * Sanitize YouTube URL by removing 't' (start time) parameter and others that break shell commands
  * @param {string} url 
