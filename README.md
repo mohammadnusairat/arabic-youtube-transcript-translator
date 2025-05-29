@@ -49,7 +49,7 @@ Arabic YouTube Transcript Translator is a full-stack web application designed to
 ![Processing Screenshot](screenshots/processing.png)  
 *Processing screen showing live job status*
 
-![Results Screenshot](screenshots/results.png)  
+![Results Screenshot](screenshots/results.jpg)  
 *Results page displaying transcript and download options*
 
 ## Why This App?
