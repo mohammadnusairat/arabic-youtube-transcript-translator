@@ -27,7 +27,7 @@
 <p align="right"><a href="#introduction">back to top ⬆️</a></p>
 
 ## Introduction
-Arabic YouTube Transcript Translator is a full-stack web application designed to automatically transcribe Arabic YouTube videos, translate the transcripts into English, and generate downloadable Markdown and PDF files. This project was created because I and my friends run an Instagram page where we post video clips, and transcribing and translating Arabic audio videos manually was very time-consuming. This app streamlines the entire process to save us significant time and effort.
+Arabic YouTube Transcript Translator is a full-stack web application designed to automatically transcribe Arabic YouTube videos, translate the transcripts into English, and generate downloadable Markdown, PDF, or SRT files. This project was created because my friends and I run an Instagram page where we post video clips, and transcribing and translating Arabic audio videos manually was very time-consuming. This app streamlines the entire process to save us significant time and effort.
 
 ## Try it Live !
 <td><a href="https://arabic-youtube-transcript-translator.vercel.app/">Live Application</a></td>
@@ -36,7 +36,7 @@ Arabic YouTube Transcript Translator is a full-stack web application designed to
 - Extract audio from YouTube videos using yt-dlp  
 - Transcribe Arabic speech to text with Azure Speech SDK  
 - Translate Arabic transcripts into English via OpenAI API  
-- Generate timestamped transcripts in Markdown and PDF formats  
+- Generate timestamped transcripts in Markdown, PDF, and SRT formats  
 - Intuitive frontend for video URL input and job progress tracking  
 - Download or copy transcripts easily  
 - Real-time job status updates with error handling  
@@ -61,7 +61,7 @@ Arabic content on YouTube is abundant but often inaccessible for those who prefe
 - **Audio Processing**: yt-dlp, FFmpeg  
 - **Speech Recognition**: Azure Speech SDK (Arabic)  
 - **Translation**: OpenAI API (GPT models)  
-- **Document Generation**: Markdown, PDF  
+- **Document Generation**: Markdown, PDF, SRT  
 - **Deployment**: - Planning deployment to **Amazon Web Services (AWS)** for scalable, production-grade hosting and resource management, leveraging services such as AWS Elastic Beanstalk, AWS Lambda, or EC2 instances depending on scaling needs 
 
 ## APIs Used and How They Are Integrated
@@ -89,6 +89,9 @@ This project utilizes several key APIs to enable the functionality of YouTube vi
 - **PDF Generation Libraries**  
   (e.g., pdfkit, or other PDF generators integrated on backend) to generate PDF versions of transcripts and translations for user-friendly downloadable documents.
 
+- **SRT Generation**  
+  This is done manually in the backend due to the simple, txt-like nature of an SRT file.
+
 ### How These APIs Work Together
 
 1. The user submits a YouTube video URL along with optional start and end times.
@@ -103,7 +106,7 @@ This project utilizes several key APIs to enable the functionality of YouTube vi
 
 6. The backend generates Markdown and PDF documents using the MarkItDown API and PDF libraries.
 
-7. The frontend fetches job status, transcript previews, and provides download links for PDF and Markdown files. 
+7. The frontend fetches job status, transcript previews, and provides download links for PDF, Markdown, and SRT files. 
 
 ## Setup Instructions
 
@@ -177,15 +180,14 @@ However, this behavior is **not consistent**. In many cases, YouTube may tempora
 
 As a result, the same video may succeed after previously failing. The app handles this gracefully by detecting cookie-related failures and informing the user with a clear message.
 
-To ensure consistent support for restricted videos in the future, support for browser-based cookies (`cookies.txt`) with `yt-dlp` may be added.
+To ensure consistent support for restricted videos in the future, support for browser-based cookies (`cookies.txt`) with `yt-dlp` must be added. I am currently evaluating the following documentations to thoroughly solve this issue: [How to Pass Cookies to YT-DLP](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp) & [Exporting YT Cookies for YT-DLP](https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies).  
 
 ## Future Improvements
-- Add multi-language support beyond Arabic-English. Most prominently Urdu.
+- Add multi-language support beyond Arabic-English. Most prominently Urdu.  
 - User authentication and saved transcript history.  
-- Export subtitles (SRT, VTT).  
-- Real-time transcription and translation streaming.
-- Add support for any raw arabic video
-- Mobile responsiveness and UI polish.
+- Real-time transcription and translation streaming.  
+- Add support for any raw arabic video  
+- Mobile responsiveness and UI polish.  
 
 ## Feedback
 Your feedback, feature requests, and bug reports are welcome via GitHub Issues or email!

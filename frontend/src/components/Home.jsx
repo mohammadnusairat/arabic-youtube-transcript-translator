@@ -142,7 +142,7 @@ function Home() {
           Paste any Arabic YouTube video link to get an accurate English transcript with timestamps
         </p>
         <p className="text-gray-600">
-          Currently under maintenance... Working on resolving cookie-based access issues for restricted videos.
+          Currently under maintenance... Working on resolving cookie-based access issues for restricted videos...
         </p>
       </div>
 
