@@ -143,7 +143,7 @@ This project utilizes several key APIs to enable the functionality of YouTube vi
 2. Optionally select start and end timestamps for transcription.  
 3. Submit and wait for the transcription and translation process to complete.  
 4. View the timestamped transcript.  
-5. Download as PDF, Markdown, or copy to clipboard.
+5. Download as PDF, Markdown, SRT, or copy to clipboard.
 
 ## Deployment & Production Notes
 
@@ -184,7 +184,6 @@ To ensure consistent support for restricted videos in the future, support for br
 - User authentication and saved transcript history.  
 - Export subtitles (SRT, VTT).  
 - Real-time transcription and translation streaming.
-- Adjust timestamps to have mins secs format so it’s more legible than merely secs
 - Add support for any raw arabic video
 - Mobile responsiveness and UI polish.
 

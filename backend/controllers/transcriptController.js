@@ -165,7 +165,8 @@ exports.getJobResults = async (req, res) => {
     // Shape the fileUrls object for frontend
     const fileUrls = {
       pdf: job.pdfUrl ? `/api/files/${jobId}/pdf` : null,
-      markdown: job.markdownUrl ? `/api/files/${jobId}/markdown` : null
+      markdown: job.markdownUrl ? `/api/files/${jobId}/markdown` : null,
+      srt: job.srtUrl ? `/api/files/${jobId}/srt` : null
     };
     
     if (job.status !== 'COMPLETED') {
@@ -272,7 +273,7 @@ async function processUploadedFileJob(jobId, audioFilePath, sanitizedTitle) {
     });
     const translation = await translationService.translateText(transcription);
     
-    // Step 3: Generate PDF and Markdown files
+    // Step 3: Generate PDF, Markdown, and SRT files
     updateJobStatus(jobId, 'GENERATING_DOCUMENTS', 80, 'Generating output documents', {
       translation
     });
@@ -280,10 +281,12 @@ async function processUploadedFileJob(jobId, audioFilePath, sanitizedTitle) {
     const outputBaseName = `upload_${path.basename(audioFilePath, path.extname(audioFilePath))}_${Date.now()}`;
     const pdfPath = path.join(config.outputDir, 'pdf', `${outputBaseName}.pdf`);
     const markdownPath = path.join(config.outputDir, 'markdown', `${outputBaseName}.md`);
+    const srtPath = path.join(config.outputDir, 'srt', `${outputBaseName}.srt`);
     
     await Promise.all([
       documentService.generatePDF(translation, sanitizedTitle, pdfPath, 0),
-      documentService.generateMarkdown(translation, sanitizedTitle, markdownPath, 0)
+      documentService.generateMarkdown(translation, sanitizedTitle, markdownPath, 0),
+      documentService.generateSRT(translation, sanitizedTitle, srtPath, 0)
     ]);
     
     // Update job with completed status and file paths
@@ -291,7 +294,8 @@ async function processUploadedFileJob(jobId, audioFilePath, sanitizedTitle) {
       transcription,
       translation,
       pdfUrl: pdfPath,
-      markdownUrl: markdownPath
+      markdownUrl: markdownPath,
+      srtUrl: srtPath
     });
     
     // Don't delete the uploaded file immediately to allow for potential re-processing
@@ -418,7 +422,7 @@ exports.cancelJob = async (req, res) => {
 };
 
 /**
- * Get file (PDF or Markdown)
+ * Get file (PDF, Markdown, or SRT)
  */
 exports.getFile = async (req, res) => {
   try {
@@ -448,7 +452,7 @@ exports.getFile = async (req, res) => {
     } else if (fileType.toLowerCase() === 'srt') {
       filePath = job.srtUrl;
     } else {
-      return res.status(400).json({ error: 'Invalid file type. Must be pdf or markdown' });
+      return res.status(400).json({ error: 'Invalid file type. Must be pdf, markdown, or srt' });
     }
 
     if (!filePath || !fs.existsSync(filePath)) {
