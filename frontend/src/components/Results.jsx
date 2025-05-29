@@ -15,7 +15,8 @@ function Results() {
   const [transcriptPreview, setTranscriptPreview] = useState('');
   const [fileUrls, setFileUrls] = useState({
     pdf: '',
-    markdown: ''
+    markdown: '',
+    srt: ''
   });
 
   useEffect(() => {
@@ -86,6 +87,7 @@ function Results() {
       // Create download link
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const extension = fileType === 'pdf' ? 'pdf' : fileType === 'markdown' ? 'md' : fileType; // 👈 now handles 'srt'
+      const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `transcript.${extension}`);
       document.body.appendChild(link);
