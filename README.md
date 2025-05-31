@@ -182,6 +182,10 @@ As a result, the same video may succeed after previously failing. The app handle
 
 To ensure consistent support for restricted videos in the future, support for browser-based cookies (`cookies.txt`) with `yt-dlp` must be added. I am currently evaluating the following documentations to thoroughly solve this issue: [How to Pass Cookies to YT-DLP](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp) & [Exporting YT Cookies for YT-DLP](https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies).  
 
+### Note on Plan Limitations of Microsoft Azure 
+
+Microsoft Azure Speech SDK Free Tier limits usage to **5 audio hours/month**.
+
 ## Future Improvements
 - Add multi-language support beyond Arabic-English. Most prominently Urdu.  
 - User authentication and saved transcript history.  
