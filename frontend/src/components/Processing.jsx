@@ -26,6 +26,18 @@ function Processing() {
 
   const clipDurationLabel = getClipDurationLabel(clipDuration);
 
+  // Map backend job statuses to the stage keys used by this page
+  const backendStatusToStage = {
+    initiated: 'validating_url',
+    downloading: 'extracting_audio',
+    transcribing: 'transcribing',
+    translating: 'translating',
+    generating_documents: 'generating_documents',
+    completed: 'completed'
+  };
+  const failedStatuses = ['failed', 'error', 'cancelled'];
+  const lastStageRef = useRef('validating_url');
+
   useEffect(() => {
     const poll = async () => {
       await fetchJobStatus();
@@ -59,7 +71,26 @@ function Processing() {
 
     try {
       const response = await getJobStatus(jobId);
-      const normalizedStatus = (response.data.status || '').split(' ')[0].toLowerCase();
+      const rawStatus = (response.data.status || '').split(' ')[0].toLowerCase();
+      const isFailed = failedStatuses.includes(rawStatus);
+      const normalizedStatus = isFailed ? 'error' : (backendStatusToStage[rawStatus] || rawStatus);
+      if (!isFailed) {
+        lastStageRef.current = normalizedStatus;
+      } else {
+        // The page may load after the job already failed, so find the failed stage from progress
+        const progressKeyToStage = [
+          ['validating', 'validating_url'],
+          ['extracting', 'extracting_audio'],
+          ['transcribing', 'transcribing'],
+          ['translating', 'translating'],
+          ['generating', 'generating_documents']
+        ];
+        const jobProgress = response.data.progress || {};
+        const reached = progressKeyToStage.filter(([key]) => jobProgress[key] > 0);
+        if (reached.length) {
+          lastStageRef.current = reached[reached.length - 1][1];
+        }
+      }
       setStatus(normalizedStatus);
       setProgress(response.data.progress || {});
       setVideoMetadata(response.data.videoMetadata || {});
@@ -75,7 +106,7 @@ function Processing() {
       }
       if (normalizedStatus === 'error') {
         clearInterval(pollingIntervalRef.current);
-        setError(response.data.error || 'An error occurred during processing');
+        setError(response.data.error || response.data.message || 'An error occurred during processing');
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to get processing status');
@@ -84,12 +115,14 @@ function Processing() {
   };
 
   const handleCancel = async () => {
+    clearInterval(pollingIntervalRef.current);
     try {
       await cancelJob(jobId);
-      navigate('/');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to cancel job');
+      // The job may have already finished or failed; leave the page either way
+      console.warn('Cancel request failed:', err.response?.data?.error || err.message);
     }
+    navigate('/');
   };
 
   const getProgressPercentage = (stage) => {
@@ -112,10 +145,6 @@ function Processing() {
   };
 
   const getStageStatus = (stage) => {
-    if (status === 'error') {
-      return 'error';
-    }
-
     const statusOrder = [
       'validating_url',
       'extracting_audio',
@@ -125,8 +154,14 @@ function Processing() {
       'completed'
     ];
 
-    const currentIndex = statusOrder.indexOf(status);
+    // On failure, mark the stage that was running as the one that errored
+    const effectiveStatus = status === 'error' ? lastStageRef.current : status;
+    const currentIndex = statusOrder.indexOf(effectiveStatus);
     const stageIndex = statusOrder.indexOf(stage);
+
+    if (status === 'error' && currentIndex === stageIndex) {
+      return 'error';
+    }
 
     if (currentIndex === stageIndex) {
       return 'in_progress';
@@ -185,7 +220,7 @@ function Processing() {
           </div>
         )}
         
-        {videoMetadata && (
+        {videoMetadata && !error && (
           <div className="flex items-center mb-6">
             {videoMetadata.thumbnail && (
               <img 

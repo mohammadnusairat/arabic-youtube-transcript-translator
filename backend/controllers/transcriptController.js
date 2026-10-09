@@ -21,7 +21,6 @@ function sanitizeFilename(name) {
 exports.startTranscriptionJob = async (req, res) => {
   try {
     console.log('==== NEW TRANSCRIPTION JOB REQUEST ====');
-    console.log('Headers:', JSON.stringify(req.headers));
     console.log('Request Body Type:', typeof req.body);
     console.log('Request Body:', req.body);
 
@@ -173,7 +172,8 @@ exports.getJobResults = async (req, res) => {
       return res.status(200).json({
         status: job.status,
         progress: job.progress,
-        message: 'Job is still processing'
+        message: job.message || 'Job is still processing',
+        error: job.error
       });
     }
 
@@ -251,10 +251,12 @@ async function processTranscriptionJob(jobId, youtubeUrl, options = {}) {
       srtUrl: srtPath
     });
 
-    await fs.remove(filePath);
   } catch (error) {
     console.error(`[JOB FAILED: ${jobId}]`, error);
     updateJobStatus(jobId, 'FAILED', 0, `Error: ${error.message}`, { error: error.message });
+  } finally {
+    // Remove downloaded audio (including partial yt-dlp files) whether the job succeeded or failed
+    await youtubeService.cleanupJobFiles(jobId);
   }
 }
 

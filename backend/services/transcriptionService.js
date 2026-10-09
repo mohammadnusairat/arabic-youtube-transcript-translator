@@ -28,21 +28,30 @@ exports.transcribeAudio = async (audioFilePath) => {
       throw new Error(`Audio file not found at path: ${audioFilePath}`);
     }
 
-    // Convert to mono 16kHz WAV using ffmpeg
-    const wavPath = path.join(path.dirname(audioFilePath), 'converted.wav');
-    await new Promise((resolve, reject) => {
-      ffmpeg(audioFilePath)
-        .audioChannels(1)
-        .audioFrequency(16000)
-        .format('wav')
-        .output(wavPath)
-        .on('end', resolve)
-        .on('error', reject)
-        .run();
-    });
+    // Convert to mono 16kHz WAV using ffmpeg (unique per input file so concurrent jobs don't collide)
+    const wavPath = path.join(
+      path.dirname(audioFilePath),
+      `${path.parse(audioFilePath).name}_converted.wav`
+    );
+    let audioBuffer;
+    try {
+      await new Promise((resolve, reject) => {
+        ffmpeg(audioFilePath)
+          .audioChannels(1)
+          .audioFrequency(16000)
+          .format('wav')
+          .output(wavPath)
+          .on('end', resolve)
+          .on('error', reject)
+          .run();
+      });
 
-    // Load converted WAV audio
-    const audioBuffer = fs.readFileSync(wavPath);
+      // Load converted WAV audio
+      audioBuffer = fs.readFileSync(wavPath);
+    } finally {
+      // The WAV is fully in memory now (or conversion failed), so remove it from disk
+      fs.rmSync(wavPath, { force: true });
+    }
     const pushStream = sdk.AudioInputStream.createPushStream();
     const CHUNK_SIZE = 1024 * 32;
     for (let i = 0; i < audioBuffer.length; i += CHUNK_SIZE) {
@@ -96,7 +105,11 @@ exports.transcribeAudio = async (audioFilePath) => {
         recognizer.close();
         if (event.reason === sdk.CancellationReason.Error) {
           console.error('[TRANSCRIBE] Canceled due to error:', event.errorDetails);
-          reject(new Error(`Azure SDK canceled: ${event.errorDetails}`));
+          if (/\b401\b/.test(event.errorDetails || '')) {
+            reject(new Error('Azure Speech authentication failed (401). Check that the Azure Speech key and region are valid.'));
+          } else {
+            reject(new Error(`Azure SDK canceled: ${event.errorDetails}`));
+          }
         } else {
           console.warn('[TRANSCRIBE] Transcription canceled');
           transcriptionSegments.length

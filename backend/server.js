@@ -32,7 +32,6 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Debug middleware to log all incoming requests
 app.use((req, res, next) => {
   console.log(`[DEBUG] ${req.method} ${req.path}`);
-  console.log(`[DEBUG] Headers: ${JSON.stringify(req.headers)}`);
   if (req.body && Object.keys(req.body).length) {
     console.log(`[DEBUG] Parsed Body: ${JSON.stringify(req.body, null, 2)}`);
   }

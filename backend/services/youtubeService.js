@@ -71,7 +71,7 @@ exports.extractAudio = async (url, jobId, options = {}) => {
 
   // Step 1: Download full audio
   await new Promise((resolve, reject) => {
-    const ytProcess = spawn(ytCommand, ytArgs, { shell: true });
+    const ytProcess = spawn(ytCommand, ytArgs);
 
     ytProcess.stderr.on('data', (data) => console.error('[YT-DLP STDERR]', data.toString()));
     ytProcess.on('error', (err) => reject(new Error(`yt-dlp failed: ${err.message}`)));
@@ -113,6 +113,25 @@ exports.extractAudio = async (url, jobId, options = {}) => {
 };
 
 /**
+ * Remove all temp audio files created for a job (e.g. <jobId>.mp3, partial <jobId>.webm)
+ */
+exports.cleanupJobFiles = async (jobId) => {
+  const outputDir = path.join(__dirname, '../temp/yt-dlp');
+  try {
+    const files = await fs.readdir(outputDir);
+    await Promise.all(
+      files
+        .filter((file) => file.startsWith(jobId))
+        .map((file) => fs.remove(path.join(outputDir, file)))
+    );
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      console.error(`[CLEANUP] Failed to remove temp files for job ${jobId}:`, err.message);
+    }
+  }
+};
+
+/**
  * Get basic video details
  */
 exports.getVideoDetails = async (youtubeUrl) => {
@@ -133,7 +152,7 @@ exports.getFullMetadata = (url) => {
     const ytCommand = ytDlpPath;
 
     const runCommand = (arg) => new Promise((resolveOne, rejectOne) => {
-      const proc = spawn(ytCommand, [arg, sanitizeUrl], { shell: true });
+      const proc = spawn(ytCommand, [arg, sanitizeUrl]);
 
       let out = '';
       proc.stdout.on('data', (data) => out += data.toString());
