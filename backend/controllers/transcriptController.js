@@ -87,7 +87,7 @@ exports.startTranscriptionJob = async (req, res) => {
 /**
  * Start transcription job for an uploaded audio file
  */
-exports.startUploadedFileJob = async (req, res, audioFilePath) => {
+exports.startUploadedFileJob = async (req, res, audioFilePath, options = {}) => {
   try {
     // Check if file exists
     if (!fs.existsSync(audioFilePath)) {
@@ -95,8 +95,9 @@ exports.startUploadedFileJob = async (req, res, audioFilePath) => {
     }
 
     // Get file information
-    const fileInfo = path.parse(audioFilePath);
-    const fileName = fileInfo.name;
+    const fileName = req.file?.originalname
+      ? path.parse(req.file.originalname).name
+      : path.parse(audioFilePath).name;
     const title = `Uploaded Audio: ${fileName}`;
     const sanitizedTitle = sanitizeFilename(title);
     
@@ -108,6 +109,7 @@ exports.startUploadedFileJob = async (req, res, audioFilePath) => {
       status: 'INITIATED',
       progress: 0,
       type: 'UPLOAD',
+      title,
       sanitizedTitle,
       audioFile: audioFilePath,
       transcription: null,
@@ -121,7 +123,7 @@ exports.startUploadedFileJob = async (req, res, audioFilePath) => {
     };
     
     // Process in the background
-    processUploadedFileJob(jobId, audioFilePath, sanitizedTitle);
+    processUploadedFileJob(jobId, audioFilePath, sanitizedTitle, options);
     
     return jobId;
   } catch (error) {
@@ -263,32 +265,47 @@ async function processTranscriptionJob(jobId, youtubeUrl, options = {}) {
 /**
  * Process an uploaded audio file
  */
-async function processUploadedFileJob(jobId, audioFilePath, sanitizedTitle) {
+async function processUploadedFileJob(jobId, audioFilePath, sanitizedTitle, options = {}) {
+  const { startTime, endTime } = options;
+  let clipPath = null;
+
   try {
-    // Step 1: Transcribe audio from Arabic
+    let sourcePath = audioFilePath;
+
+    // Step 1: Cut the requested clip out of the upload (if a time range was given)
+    if (startTime != null && endTime != null) {
+      updateJobStatus(jobId, 'EXTRACTING_AUDIO', 10, 'Extracting selected clip from uploaded file');
+      clipPath = path.join(
+        path.dirname(audioFilePath),
+        `${path.parse(audioFilePath).name}_clip.wav`
+      );
+      sourcePath = await transcriptionService.extractClip(audioFilePath, clipPath, startTime, endTime);
+    }
+
+    // Step 2: Transcribe audio from Arabic
     updateJobStatus(jobId, 'TRANSCRIBING', 30, 'Transcribing uploaded audio');
-    const transcription = await transcriptionService.transcribeAudio(audioFilePath);
+    const transcription = await transcriptionService.transcribeAudio(sourcePath);
     
-    // Step 2: Translate from Arabic to English
+    // Step 3: Translate from Arabic to English
     updateJobStatus(jobId, 'TRANSLATING', 60, 'Translating transcription to English', {
       transcription
     });
     const translation = await translationService.translateText(transcription);
     
-    // Step 3: Generate PDF, Markdown, and SRT files
+    // Step 4: Generate PDF, Markdown, and SRT files
     updateJobStatus(jobId, 'GENERATING_DOCUMENTS', 80, 'Generating output documents', {
       translation
     });
     
-    const outputBaseName = `upload_${path.basename(audioFilePath, path.extname(audioFilePath))}_${Date.now()}`;
+    const outputBaseName = `${sanitizedTitle}_${Date.now()}`;
     const pdfPath = path.join(config.outputDir, 'pdf', `${outputBaseName}.pdf`);
     const markdownPath = path.join(config.outputDir, 'markdown', `${outputBaseName}.md`);
     const srtPath = path.join(config.outputDir, 'srt', `${outputBaseName}.srt`);
     
     await Promise.all([
-      documentService.generatePDF(translation, sanitizedTitle, pdfPath, 0),
-      documentService.generateMarkdown(translation, sanitizedTitle, markdownPath, 0),
-      documentService.generateSRT(translation, sanitizedTitle, srtPath, 0)
+      documentService.generatePDF(translation, sanitizedTitle, pdfPath, startTime || 0),
+      documentService.generateMarkdown(translation, sanitizedTitle, markdownPath, startTime || 0),
+      documentService.generateSRT(translation, sanitizedTitle, srtPath, startTime || 0)
     ]);
     
     // Update job with completed status and file paths
@@ -299,23 +316,20 @@ async function processUploadedFileJob(jobId, audioFilePath, sanitizedTitle) {
       markdownUrl: markdownPath,
       srtUrl: srtPath
     });
-    
-    // Don't delete the uploaded file immediately to allow for potential re-processing
-    // Instead, schedule cleanup after a certain period (e.g., 1 hour)
-    setTimeout(async () => {
-      try {
-        await fs.remove(audioFilePath);
-        console.log(`Cleaned up uploaded file: ${audioFilePath}`);
-      } catch (cleanupError) {
-        console.error(`Failed to clean up file ${audioFilePath}:`, cleanupError);
-      }
-    }, 60 * 60 * 1000); // 1 hour
-    
   } catch (error) {
     console.error(`Error processing uploaded file job ${jobId}:`, error);
     updateJobStatus(jobId, 'FAILED', 0, `Error: ${error.message}`, { 
       error: error.message 
     });
+  } finally {
+    // Remove the upload and any extracted clip whether the job succeeded or failed
+    await Promise.all(
+      [audioFilePath, clipPath]
+        .filter(Boolean)
+        .map((file) => fs.remove(file).catch((err) =>
+          console.error(`Failed to clean up file ${file}:`, err.message)
+        ))
+    );
   }
 }
 
@@ -329,6 +343,7 @@ function updateJobStatus(jobId, status, progressValue, message = null, data = {}
   const stageToKey = {
     'INITIATED': 'validating',
     'DOWNLOADING': 'extracting',
+    'EXTRACTING_AUDIO': 'extracting',
     'TRANSCRIBING': 'transcribing',
     'TRANSLATING': 'translating',
     'GENERATING_DOCUMENTS': 'generating'

@@ -1,6 +1,7 @@
 // services/youtubeService.js
 
 const { spawn } = require('child_process');
+const os = require('os');
 const path = require('path');
 const fs = require('fs-extra');
 const { v4: uuidv4 } = require('uuid');
@@ -13,7 +14,63 @@ const ytDlpPath = isWindows
   ? (process.env.YT_DLP_BINARY_LOCAL || 'yt-dlp')
   : (process.env.YT_DLP_BINARY || 'yt-dlp');
 
-const ffmpegPath = process.env.FFMPEG_PATH || '/usr/bin/ffmpeg';  // fallback to 'ffmpeg' in PATH
+/**
+ * Optional yt-dlp network settings, both off unless the env var is set:
+ * - YTDLP_PROXY: proxy URL, e.g. http://user:pass@host:port (residential proxies avoid YouTube's datacenter-IP blocking)
+ * - YTDLP_COOKIES: contents of a Netscape-format cookies.txt, raw or base64-encoded
+ */
+let cookiesFilePath = null;
+
+function getCookiesFile() {
+  const raw = process.env.YTDLP_COOKIES;
+  if (!raw) return null;
+  if (cookiesFilePath) return cookiesFilePath;
+
+  // Raw cookies.txt contents are tab-separated; anything else is treated as base64
+  const content = raw.includes('\t') ? raw : Buffer.from(raw, 'base64').toString('utf8');
+  cookiesFilePath = path.join(os.tmpdir(), 'yt-dlp-cookies.txt');
+  fs.writeFileSync(cookiesFilePath, content, { mode: 0o600 });
+  return cookiesFilePath;
+}
+
+exports.getYtDlpNetworkArgs = () => {
+  const args = [];
+  if (process.env.YTDLP_PROXY) {
+    args.push('--proxy', process.env.YTDLP_PROXY);
+  }
+  const cookiesFile = getCookiesFile();
+  if (cookiesFile) {
+    args.push('--cookies', cookiesFile);
+  }
+  return args;
+};
+
+/**
+ * Format yt-dlp args for logging without leaking proxy credentials
+ */
+exports.formatArgsForLog = (args) => {
+  return args
+    .map((arg, i) => (args[i - 1] === '--proxy' ? '<proxy>' : arg))
+    .join(' ');
+};
+
+/**
+ * Map yt-dlp stderr to a known error code, or null if unrecognized
+ */
+exports.classifyYtDlpError = (stderr = '') => {
+  const text = stderr.toLowerCase();
+  if (text.includes('not a bot')) return 'youtube_blocked';
+  if (text.includes('confirm your age') || text.includes('age-restricted')) return 'video_restricted';
+  if (text.includes('private video') || text.includes('video unavailable')) return 'video_unavailable';
+  if (text.includes('http error 403') || text.includes('http error 429')) return 'youtube_blocked';
+  return null;
+};
+
+exports.YT_DLP_ERROR_MESSAGES = {
+  youtube_blocked: 'YouTube is currently blocking downloads from our server. Please upload the audio or video file instead.',
+  video_restricted: 'This video is age-restricted or requires sign-in, so it cannot be downloaded. Please upload the audio or video file instead.',
+  video_unavailable: 'This video is private or unavailable.'
+};
 
 /**
  * Validate if URL is a YouTube link
@@ -41,17 +98,17 @@ function sanitizeYouTubeUrl(url) {
 }
 
 /**
- * Extract audio from YouTube URL using yt-dlp, then trim with ffmpeg
+ * Extract audio from YouTube URL using yt-dlp. When a time range is given, only that
+ * section is downloaded instead of the full audio track.
  */
 exports.extractAudio = async (url, jobId, options = {}) => {
   const { startTime, endTime } = options;
   const outputDir = path.join(__dirname, '../temp/yt-dlp');
   await fs.ensureDir(outputDir);
 
-  const rawOutputPath = path.join(outputDir, `${jobId}.mp3`);
-  const trimmedOutputPath = path.join(outputDir, `${jobId}_trimmed.mp3`);
+  const outputPath = path.join(outputDir, `${jobId}.mp3`);
 
-  // Sanitize URL to remove &t=... that breaks Windows shell
+  // Sanitize URL to remove &t=... so it doesn't conflict with the requested time range
   const cleanUrl = sanitizeYouTubeUrl(url);
 
   const ytArgs = [
@@ -62,54 +119,38 @@ exports.extractAudio = async (url, jobId, options = {}) => {
     '--no-check-certificates',
     '--no-warnings',
     '--add-metadata',
-    '--output', rawOutputPath
+    ...exports.getYtDlpNetworkArgs(),
+    '--output', outputPath
   ];
 
-  const ytCommand = ytDlpPath;
+  if (startTime != null && endTime != null) {
+    // Re-encode at the cut points so the clip starts/ends exactly at the requested times
+    // (stream copy can only cut on packet boundaries, which can be several seconds off)
+    ytArgs.push('--download-sections', `*${startTime}-${endTime}`, '--force-keyframes-at-cuts');
+  }
 
-  console.log('[YT-DLP COMMAND]', ytCommand, ytArgs.join(' '));
+  console.log('[YT-DLP COMMAND]', ytDlpPath, exports.formatArgsForLog(ytArgs));
 
-  // Step 1: Download full audio
   await new Promise((resolve, reject) => {
-    const ytProcess = spawn(ytCommand, ytArgs);
+    const ytProcess = spawn(ytDlpPath, ytArgs);
+    let stderr = '';
 
-    ytProcess.stderr.on('data', (data) => console.error('[YT-DLP STDERR]', data.toString()));
+    ytProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
+      console.error('[YT-DLP STDERR]', data.toString());
+    });
     ytProcess.on('error', (err) => reject(new Error(`yt-dlp failed: ${err.message}`)));
     ytProcess.on('exit', (code) => {
-      if (code !== 0) return reject(new Error(`yt-dlp exited with code ${code}`));
-      resolve();
+      if (code === 0) return resolve();
+
+      const errorCode = exports.classifyYtDlpError(stderr);
+      const error = new Error(exports.YT_DLP_ERROR_MESSAGES[errorCode] || `yt-dlp exited with code ${code}`);
+      error.code = errorCode;
+      reject(error);
     });
   });
 
-  // Step 2: Trim audio with ffmpeg (only if time range is given)
-  if (startTime != null && endTime != null) {
-    const ffmpegArgs = [
-      '-y',
-      '-i', rawOutputPath,
-      '-ss', startTime.toString(),
-      '-to', endTime.toString(),
-      '-c', 'copy',
-      trimmedOutputPath
-    ];
-
-    console.log('[FFMPEG COMMAND] ffmpeg', ffmpegArgs.join(' '));
-
-    await new Promise((resolve, reject) => {
-      const ffmpegProcess = spawn(ffmpegPath, ffmpegArgs);
-
-      ffmpegProcess .stderr.on('data', (data) => console.error('[FFMPEG STDERR]', data.toString()));
-      ffmpegProcess .on('error', (err) => reject(new Error(`ffmpeg failed: ${err.message}`)));
-      ffmpegProcess .on('exit', (code) => {
-        if (code !== 0) return reject(new Error(`ffmpeg exited with code ${code}`));
-        resolve();
-      });
-    });
-
-    await fs.remove(rawOutputPath); // Remove original
-    await fs.move(trimmedOutputPath, rawOutputPath); // Replace with trimmed version
-  }
-
-  return rawOutputPath;
+  return outputPath;
 };
 
 /**
@@ -152,7 +193,7 @@ exports.getFullMetadata = (url) => {
     const ytCommand = ytDlpPath;
 
     const runCommand = (arg) => new Promise((resolveOne, rejectOne) => {
-      const proc = spawn(ytCommand, [arg, sanitizeUrl]);
+      const proc = spawn(ytCommand, [arg, ...exports.getYtDlpNetworkArgs(), sanitizeUrl]);
 
       let out = '';
       proc.stdout.on('data', (data) => out += data.toString());

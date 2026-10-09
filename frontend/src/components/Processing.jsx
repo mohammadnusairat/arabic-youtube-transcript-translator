@@ -30,6 +30,7 @@ function Processing() {
   const backendStatusToStage = {
     initiated: 'validating_url',
     downloading: 'extracting_audio',
+    extracting_audio: 'extracting_audio',
     transcribing: 'transcribing',
     translating: 'translating',
     generating_documents: 'generating_documents',

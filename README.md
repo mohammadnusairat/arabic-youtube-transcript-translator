@@ -1,20 +1,23 @@
 # Arabic YouTube Transcript Translator
 
 ## Table of Contents
-<dev align="center">
+<div align="center">
     <table align="center">
         <tr>
-            <td><a href="#introduction">Introduction</a></td>        
+            <td><a href="#introduction">Introduction</a></td>
             <td><a href="#features">Features</a></td>
             <td><a href="#screenshots">Screenshots</a></td>
             <td><a href="#why-this-app">Why This App?</a></td>
+            <td><a href="#how-it-works">How It Works</a></td>
             <td><a href="#technologies-used">Technologies Used</a></td>
-            <td><a href="#APIs-Used-and-How-They-Are-Integrated">APIs Used and How They Are Integrated</a></td>
         </tr>
         <tr>
-            <td><a href="#setup-instructions">Setup Instructions</a></td>
+            <td><a href="#local-setup">Local Setup</a></td>
             <td><a href="#how-to-use-the-app">How to Use the App</a></td>
-            <td><a href="#deployment--production-notes">Deployment & Production Notes</a></td>
+            <td><a href="#api-reference">API Reference</a></td>
+            <td><a href="#deployment">Deployment</a></td>
+            <td><a href="#youtube-blocking-sign-in-to-confirm-youre-not-a-bot">YouTube Blocking</a></td>
+            <td><a href="#known-limitations">Known Limitations</a></td>
         </tr>
         <tr>
             <td><a href="#future-improvements">Future Improvements</a></td>
@@ -22,24 +25,26 @@
             <td><a href="#contact">Contact</a></td>
         </tr>
     </table>
-</dev>
+</div>
 
 <p align="right"><a href="#introduction">back to top ⬆️</a></p>
 
 ## Introduction
-Arabic YouTube Transcript Translator is a full-stack web application designed to automatically transcribe Arabic YouTube videos, translate the transcripts into English, and generate downloadable Markdown, PDF, or SRT files. This project was created because my friends and I run an Instagram page where we post video clips, and transcribing and translating Arabic audio videos manually was very time-consuming. This app streamlines the entire process to save us significant time and effort.
+Arabic YouTube Transcript Translator is a full-stack web application that transcribes Arabic audio from YouTube videos or uploaded audio/video files, translates the transcript into English, and generates downloadable Markdown, PDF, and SRT files with timestamps. This project was created because my friends and I run an Instagram page where we post video clips, and transcribing and translating Arabic audio manually was very time-consuming. This app streamlines the entire process to save us significant time and effort.
 
 ## Try it Live !
-<td><a href="https://arabic-youtube-transcript-translator.vercel.app/">Live Application</a></td>
+<a href="https://arabic-youtube-transcript-translator.vercel.app/">Live Application</a>
 
 ## Features
-- Extract audio from YouTube videos using yt-dlp  
-- Transcribe Arabic speech to text with Azure Speech SDK  
-- Translate Arabic transcripts into English via OpenAI API  
-- Generate timestamped transcripts in Markdown, PDF, and SRT formats  
-- Intuitive frontend for video URL input and job progress tracking  
-- Download or copy transcripts easily  
-- Real-time job status updates with error handling  
+- Two input options:
+  - **YouTube link**: downloads only the selected clip of the video's audio with yt-dlp
+  - **File upload**: any audio or video file (MP3, M4A, WAV, MP4, MOV, WebM, ...) up to 200MB
+- Pick a start and end time to transcribe just a clip (or leave blank to transcribe a whole uploaded file)
+- Arabic speech-to-text with the Azure Speech SDK
+- Arabic-to-English translation with the OpenAI API
+- Timestamped transcripts downloadable as Markdown, PDF, and SRT, or copied to the clipboard
+- Live job progress (validating, extracting audio, transcribing, translating, generating files) with clear error messages
+- Detects when YouTube blocks the server and offers file upload instead
 
 ## Screenshots
 
@@ -55,143 +60,169 @@ Arabic YouTube Transcript Translator is a full-stack web application designed to
 ## Why This App?
 Arabic content on YouTube is abundant but often inaccessible for those who prefer reading or non-Arabic speakers. Manual transcription and translation are slow and error-prone, especially for Arabic audio. This app automates and accelerates the process, making it easier to create accessible, shareable video transcripts.
 
+## How It Works
+
+```
+                        ┌──────────────────────── Backend (Node.js / Express) ─────────────────────────┐
+YouTube URL + times ──▶ │ yt-dlp: download only the selected clip ──┐                                  │
+                        │                                           ├─▶ Azure Speech ─▶ OpenAI ─▶ PDF  │
+Audio/video upload  ──▶ │ ffmpeg: cut the selected clip (optional) ─┘   (Arabic STT)  (translate)  MD  │
+                        │                                                                         SRT  │
+                        └──────────────────────────────────────────────────────────────────────────────┘
+        ▲                                                │
+        └──── React frontend polls /api/status/:jobId ◀──┘
+```
+
+1. The user either pastes a YouTube URL (and fetches its duration) or uploads an audio/video file, and picks a start and end time.
+2. The backend creates a job and returns a job ID right away. The frontend polls the job's status every 2 seconds.
+3. **YouTube:** yt-dlp downloads only the requested section of the audio as MP3. **Upload:** ffmpeg cuts the requested clip out of the uploaded file.
+4. The audio is converted to 16kHz mono WAV and sent to Azure Speech for Arabic (`ar-EG`) transcription, which returns timestamped segments.
+5. The Arabic segments are sent to OpenAI in batches and translated into English.
+6. The backend writes the translated, timestamped transcript to PDF, Markdown, and SRT files. Timestamps are offset by the clip's start time so they match the original video.
+7. The frontend shows a preview and download links. Temporary audio files are deleted when the job finishes, whether it succeeded or failed.
+
 ## Technologies Used
-- **Frontend**: React (Vite), Tailwind CSS  
-- **Backend**: Node.js, Express.js  
-- **Audio Processing**: yt-dlp, FFmpeg  
-- **Speech Recognition**: Azure Speech SDK (Arabic)  
-- **Translation**: OpenAI API (GPT models)  
-- **Document Generation**: Markdown, PDF, SRT  
-- **Deployment**: - Planning deployment to **Amazon Web Services (AWS)** for scalable, production-grade hosting and resource management, leveraging services such as AWS Elastic Beanstalk, AWS Lambda, or EC2 instances depending on scaling needs 
+- **Frontend**: React 18, Vite 5, Tailwind CSS, React Router, Axios
+- **Backend**: Node.js 18, Express
+- **Audio processing**: yt-dlp (YouTube downloads), FFmpeg (clipping and audio conversion, via fluent-ffmpeg), Multer (file uploads)
+- **Speech recognition**: Microsoft Azure Speech SDK (`microsoft-cognitiveservices-speech-sdk`), Arabic (`ar-EG`)
+- **Translation**: OpenAI API (`gpt-3.5-turbo`)
+- **Document generation**: PDF with `pdf-lib`. Markdown and SRT are generated directly in the backend, since both are simple text formats.
+- **Deployment**: Backend on [Railway](https://railway.app) (Docker), frontend on [Vercel](https://vercel.com)
 
-## APIs Used and How They Are Integrated
+### Project Structure
+```
+backend/
+├── server.js                    # Express app setup
+├── routes/api.js                # API routes (transcribe, upload, status, files, metadata)
+├── controllers/
+│   └── transcriptController.js  # Job creation, in-memory job store, processing pipeline
+├── services/
+│   ├── youtubeService.js        # yt-dlp download, proxy/cookie support, error detection
+│   ├── transcriptionService.js  # ffmpeg conversion/clipping + Azure Speech transcription
+│   ├── translationService.js    # OpenAI translation
+│   └── documentService.js       # PDF, Markdown, and SRT generation
+├── middleware/                  # Upload handling (Multer) and YouTube URL extraction
+├── config/config.js             # Environment-based configuration
+└── Dockerfile                   # Production image (Node 18 + ffmpeg + yt-dlp)
+frontend/
+└── src/
+    ├── components/              # Home, Processing, Results, Header, Footer
+    ├── contexts/JobContext.jsx  # Current job state
+    └── utils/api.js             # Backend API client
+```
 
-This project utilizes several key APIs to enable the functionality of YouTube video processing, transcription, translation, and document generation:
+## Local Setup
 
-- **YouTube Data API**  
-  Used to validate and retrieve metadata about YouTube videos, such as video title, duration, and description. This allows the app to show accurate video information and ensure URLs are valid.
-
-- **yt-dlp (YouTube Downloader)**  
-  A command-line tool integrated into the backend to download YouTube videos' audio tracks efficiently. It extracts audio in MP3 format for further processing.
-
-- **FFmpeg**  
-  Used for trimming audio clips to specified start and end times, converting formats if needed, and preparing audio for transcription.
-
-- **Microsoft Azure Speech SDK**  
-  Provides high-quality Arabic speech-to-text transcription services. The backend sends the extracted audio to Azure for recognition and receives time-stamped transcript data.
-
-- **OpenAI API (GPT models)**  
-  Employed to translate Arabic transcription text into English. The backend sends Arabic transcript segments to OpenAI’s models to produce accurate English translations.
-
-- **Microsoft MarkItDown API**  
-  Used for converting transcript and translation content into formatted Markdown documents, which are then saved and served for download.
-
-- **PDF Generation Libraries**  
-  (e.g., pdfkit, or other PDF generators integrated on backend) to generate PDF versions of transcripts and translations for user-friendly downloadable documents.
-
-- **SRT Generation**  
-  This is done manually in the backend due to the simple, txt-like nature of an SRT file.
-
-### How These APIs Work Together
-
-1. The user submits a YouTube video URL along with optional start and end times.
-
-2. The backend validates the URL using YouTube Data API and fetches metadata.
-
-3. yt-dlp downloads the video audio; FFmpeg trims the audio clip if specified.
-
-4. The audio is sent to Azure Speech SDK for Arabic transcription.
-
-5. Transcribed Arabic text segments are sent to OpenAI API for English translation.
-
-6. The backend generates Markdown and PDF documents using the MarkItDown API and PDF libraries.
-
-7. The frontend fetches job status, transcript previews, and provides download links for PDF, Markdown, and SRT files. 
-
-## Setup Instructions
+### Prerequisites
+- **Node.js 18**. This matches the production Docker image. Newer versions can break the Azure Speech SDK: on Node 26, transcription fails with `StatusCode: 1006`. If you use [nvm](https://github.com/nvm-sh/nvm): `nvm install 18 && nvm use 18`.
+- **yt-dlp** and **FFmpeg** (including `ffprobe`) on your `PATH`:
+  - macOS: `brew install yt-dlp ffmpeg`
+  - Ubuntu/Debian: `sudo apt install ffmpeg` and `pip install yt-dlp`
+  - Windows: install both and add them to your `PATH` (or set the paths in `.env`, see below)
+- An **Azure Speech** resource: [Azure Portal](https://portal.azure.com) → create a *Speech service* → **Keys and Endpoint** (copy a key and the region). The free tier (F0) works.
+- An **OpenAI API key** with available credits: [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
 
 ### Backend
-1. Navigate to the `backend/` directory.  
-2. Install dependencies:  
+1. Install dependencies:
     ```bash
+    cd backend
     npm install
     ```
-3. Create a `.env` file and add your API keys:
-    ```
-    AZURE_SPEECH_KEY=your_azure_key
-    AZURE_SPEECH_REGION=your_azure_region
-    OPENAI_API_KEY=your_openai_key
-    ```
-4. Start the backend server:  
+    If `npm install` fails on `phantomjs-prebuilt` or `yt-dlp-exec` (common on macOS), run `npm install --ignore-scripts` instead. Those two packages are listed in `package.json` but not used by the code, so skipping their install scripts is safe.
+2. Create your `.env` from the example and fill in your keys:
     ```bash
-    npm run start
+    cp .env.example .env
     ```
-5. Backend API runs on `http://localhost:4000`
+    | Variable | Required | Description |
+    |---|---|---|
+    | `OPENAI_API_KEY` | Yes | OpenAI API key for translation |
+    | `MARKITDOWN_API_KEY` | Yes | Azure **Speech** key (the `MARKITDOWN_` prefix is historical) |
+    | `MARKITDOWN_REGION` | Yes | Azure Speech region, e.g. `eastus` |
+    | `PORT` | No | Backend port (default `4000`) |
+    | `YTDLP_PROXY` | No | Proxy URL for yt-dlp, see [YouTube Blocking](#youtube-blocking-sign-in-to-confirm-youre-not-a-bot) |
+    | `YTDLP_COOKIES` | No | YouTube cookies for yt-dlp, see [YouTube Blocking](#youtube-blocking-sign-in-to-confirm-youre-not-a-bot) |
+    | `FFMPEG_PATH` | No | Path to `ffmpeg` if it isn't on your `PATH` |
+    | `YT_DLP_BINARY` | No | Path to `yt-dlp` if it isn't on your `PATH` (on Windows the download step reads `YT_DLP_BINARY_LOCAL`) |
+3. Start the backend:
+    ```bash
+    npm start        # or: npm run dev (auto-restarts with nodemon)
+    ```
+    The API runs at `http://localhost:4000/api`. Check it with `curl http://localhost:4000/api/health`.
 
 ### Frontend
-1. Navigate to the `frontend/` directory.  
-2. Install dependencies:  
+1. In a second terminal:
     ```bash
+    cd frontend
     npm install
-    ```
-3. Start the frontend development server:  
-    ```bash
     npm run dev
     ```
-4. Frontend runs on `http://localhost:5173`  
-**Note:** Make sure backend is running before using the frontend.
+2. Open `http://localhost:5173`. In development, Vite proxies `/api` requests to `http://localhost:4000`, so no extra configuration is needed. Make sure the backend is running first.
 
 ## How to Use the App
-1. Enter a YouTube video URL with Arabic audio.  
-2. Optionally select start and end timestamps for transcription.  
-3. Submit and wait for the transcription and translation process to complete.  
-4. View the timestamped transcript.  
-5. Download as PDF, Markdown, SRT, or copy to clipboard.
+**From YouTube**
+1. Choose **YouTube link**, paste the video URL, and click **Fetch Video Metadata** to load its duration.
+2. Enter a start and end time (min:sec). Clips must be at least 5 seconds.
+3. Click **Start Processing** and watch the progress screen.
+4. On the results page, preview the transcript and download it as PDF, Markdown, or SRT, or copy it to the clipboard.
 
-## Deployment & Production Notes
+**From a file**
+1. Choose **Upload file** and pick an audio or video file (up to 200MB).
+2. Optionally enter a start and end time. Leave them blank to transcribe the whole file.
+3. Click **Start Processing**. The button shows upload progress, then you're taken to the progress screen and results as above.
 
-This project uses a modern, scalable deployment approach combining cloud-native technologies to ensure reliability and efficiency:
+If YouTube is blocking the server, the app says so and shows an **Upload a file instead** button.
 
-### Backend Deployment
+## API Reference
+All routes are under `/api`.
 
-- **Platform:** [Railway](https://railway.app) — chosen for its simplicity in deploying Dockerized Node.js backends with native support for environment variables and scalable hosting.
-- **Containerization:** The backend is packaged with a **Dockerfile** that installs all native dependencies (`yt-dlp`, `ffmpeg`, Python 3) and Node.js packages, ensuring consistent behavior between local development and production.
-- **Environment Variables:** All sensitive keys (Azure Speech, OpenAI API, MarkItDown API) are securely injected via Railway’s environment variable management, eliminating the need to commit secrets.
-- **Why:** Docker allows full control over system dependencies needed for audio processing tools, and Railway abstracts server maintenance and scaling.
+| Method | Route | Description |
+|---|---|---|
+| `GET` | `/health` | Health check |
+| `GET` | `/metadata?url=<youtube-url>` | Video duration in seconds (`{ durationSeconds }`) |
+| `POST` | `/transcribe` | Start a YouTube job. JSON body: `{ url, startTime, endTime }` (seconds) |
+| `POST` | `/upload` | Start an upload job. Multipart form: `audioFile`, optional `startTime` and `endTime` (seconds) |
+| `GET` | `/status/:jobId` | Job status, progress, and error. Includes the transcript and `fileUrls` when completed |
+| `POST` | `/cancel/:jobId` | Cancel a running job |
+| `GET` | `/files/:jobId/:fileType` | Download `pdf`, `markdown`, or `srt` for a completed job |
 
-### Frontend Deployment
+When YouTube refuses a download, `/metadata` responds with `403` and `{ error: "youtube_blocked" | "video_restricted", message }`, and a job's `error` field contains the same message.
 
-- **Platform:** [Vercel](https://vercel.com) — ideal for static frontend hosting with seamless integration for React (Vite) apps.
-- **Configuration:** The frontend is configured to use a build-time environment variable (`VITE_BACKEND_URL`) pointing to the Railway backend URL, allowing seamless communication between frontend and backend without CORS issues.
-- **Proxying:** Local development uses Vite’s proxy feature to forward API requests to the local backend, mimicking production behavior.
-- **Why:** Vercel offers fast global CDN, automatic HTTPS, and zero-config deployments which perfectly suit React SPAs.
+## Deployment
 
-### Note on Restricted YouTube Videos
+### Backend (Railway)
+- Railway builds `backend/Dockerfile`, which installs Node 18, FFmpeg, and the latest yt-dlp, then runs `npm start`.
+- Set `OPENAI_API_KEY`, `MARKITDOWN_API_KEY`, and `MARKITDOWN_REGION` (plus `YTDLP_PROXY` / `YTDLP_COOKIES` if needed) in Railway's **Variables** tab. Railway provides `PORT` automatically.
+- yt-dlp is installed when the image is built. Redeploy every so often to pick up yt-dlp updates, since YouTube changes frequently.
 
-Some YouTube videos may initially fail to load metadata due to cookie-based restrictions imposed by YouTube, such as age verification or bot detection. These restrictions often result in errors like:  
-`Sign in to confirm you’re not a bot. Use --cookies-from-browser or --cookies for the authentication.`  
+### Frontend (Vercel)
+- Vercel builds the Vite app from `frontend/`.
+- `frontend/.env.production` sets `VITE_BACKEND_URL` to the Railway backend's `/api` URL. Update it if the backend URL changes.
 
-However, this behavior is **not consistent**. In many cases, YouTube may temporarily relax these restrictions based on factors like:
+## YouTube Blocking ("Sign in to confirm you're not a bot")
+YouTube often blocks downloads from cloud/datacenter IP addresses such as Railway's. When that happens, every YouTube request fails with:
 
-- IP reputation of the backend server (e.g. Railway-hosted container)
-- Time of access or geographic routing
-- Removal of suspicious URL parameters (e.g. `&t=1s`)
-- YouTube backend updates or caching
+`Sign in to confirm you’re not a bot. Use --cookies-from-browser or --cookies for the authentication.`
 
-As a result, the same video may succeed after previously failing. The app handles this gracefully by detecting cookie-related failures and informing the user with a clear message.
+This depends on the server's IP, not on the video, so the same videos usually work when the app runs locally. The app detects this error and tells users to upload the file instead. To make YouTube links work again on the server, you have two options, both set as Railway variables:
 
-To ensure consistent support for restricted videos in the future, support for browser-based cookies (`cookies.txt`) with `yt-dlp` must be added. I am currently evaluating the following documentations to thoroughly solve this issue: [How to Pass Cookies to YT-DLP](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp) & [Exporting YT Cookies for YT-DLP](https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies).  
+- **`YTDLP_PROXY`** (most reliable): route yt-dlp through a residential proxy, e.g. `http://user:pass@host:port`. This is usually paid per GB. Because only the selected clip is downloaded, usage per job is small.
+- **`YTDLP_COOKIES`**: export YouTube cookies from a browser signed in to a **throwaway** Google account, following yt-dlp's guides: [How to pass cookies](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp) and [Exporting YouTube cookies](https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies). Paste the `cookies.txt` contents into the variable, or base64-encode it first (`base64 -i cookies.txt`) to avoid problems with line breaks. Cookies expire and need replacing periodically.
 
-### Note on Plan Limitations of Microsoft Azure 
+Note that automating downloads with cookies or proxies goes against YouTube's Terms of Service, and accounts used for cookies can be flagged or banned. File upload works regardless of YouTube.
 
-Microsoft Azure Speech SDK Free Tier limits usage to **5 audio hours/month**.
+## Known Limitations
+- **Azure free tier:** the Speech free tier (F0) allows **5 audio hours per month**. Whole-file uploads have no length limit, so long files use up the quota quickly.
+- **Jobs are stored in memory:** restarting or redeploying the backend loses all job statuses, so links to older results stop working.
+- **Generated files are kept:** PDF, Markdown, and SRT files in `backend/outputs/` are never deleted automatically.
+- **Upload size:** uploads are limited to 200MB, and the whole file is uploaded even when only a clip is transcribed.
 
 ## Future Improvements
-- Add multi-language support beyond Arabic-English. Most prominently Urdu.  
-- User authentication and saved transcript history.  
-- Real-time transcription and translation streaming.  
-- Add support for any raw arabic video  
-- Mobile responsiveness and UI polish.  
+- Add multi-language support beyond Arabic-English. Most prominently Urdu.
+- User authentication and saved transcript history.
+- Persist jobs in a database and clean up old generated files.
+- Real-time transcription and translation streaming.
+- Mobile responsiveness and UI polish.
 
 ## Feedback
 Your feedback, feature requests, and bug reports are welcome via GitHub Issues or email!

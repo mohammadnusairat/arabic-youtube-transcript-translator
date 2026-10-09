@@ -24,28 +24,19 @@ const storage = multer.diskStorage({
   }
 });
 
-// File filter to only allow audio files
+// File filter to only allow audio and video files (audio is extracted from video later)
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = [
-    'audio/mpeg',
-    'audio/mp3',
-    'audio/wav',
-    'audio/ogg',
-    'audio/m4a',
-    'audio/x-m4a',
-    'audio/aac'
-  ];
-
-  if (allowedTypes.includes(file.mimetype)) {
+  if (file.mimetype.startsWith('audio/') || file.mimetype.startsWith('video/')) {
     cb(null, true);
   } else {
-    cb(new Error('Unsupported file type. Only audio files are allowed.'), false);
+    cb(new Error('Unsupported file type. Only audio or video files are allowed.'), false);
   }
 };
 
-// Size limits for uploads (50MB)
+// Size limits for uploads (200MB, to allow for video files)
+const MAX_UPLOAD_MB = 200;
 const limits = {
-  fileSize: 50 * 1024 * 1024
+  fileSize: MAX_UPLOAD_MB * 1024 * 1024
 };
 
 // Create the multer upload middleware
@@ -61,16 +52,16 @@ const handleUploadError = (err, req, res, next) => {
     // A multer error occurred when uploading
     if (err.code === 'LIMIT_FILE_SIZE') {
       return res.status(413).json({
-        error: 'File too large. Maximum size is 50MB.'
+        error: `File too large. Maximum size is ${MAX_UPLOAD_MB}MB.`
       });
     }
     return res.status(400).json({
       error: `Upload error: ${err.message}`
     });
   } else if (err) {
-    // An unknown error occurred
-    return res.status(500).json({
-      error: `Upload error: ${err.message}`
+    // Rejected by fileFilter (unsupported file type)
+    return res.status(400).json({
+      error: err.message
     });
   }
   next();

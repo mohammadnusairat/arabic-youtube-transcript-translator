@@ -32,6 +32,35 @@ export const submitUrl = async ({ url, startTime, endTime }) => {
 };
 
 /**
+ * Upload an audio or video file for processing
+ * @param {Object} params
+ * @param {File} params.file - The audio/video file
+ * @param {number|null} params.startTime - Clip start in seconds (null for the whole file)
+ * @param {number|null} params.endTime - Clip end in seconds (null for the whole file)
+ * @param {Function} params.onProgress - Called with upload percentage (0-100)
+ * @returns {Promise<Object>} - API response data
+ */
+export const uploadFile = async ({ file, startTime, endTime, onProgress }) => {
+  const formData = new FormData();
+  formData.append('audioFile', file);
+  if (startTime != null && endTime != null) {
+    formData.append('startTime', startTime);
+    formData.append('endTime', endTime);
+  }
+
+  const response = await apiClient.post('/upload', formData, {
+    // Override the JSON default so axios sends multipart with the correct boundary
+    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: (event) => {
+      if (onProgress && event.total) {
+        onProgress(Math.round((event.loaded / event.total) * 100));
+      }
+    },
+  });
+  return response.data;
+};
+
+/**
  * Get status of a processing job
  */
 export const getJobStatus = (jobId) => apiClient.get(`/status/${jobId}`);

@@ -141,6 +141,25 @@ exports.transcribeAudio = async (audioFilePath) => {
   }
 };
 
+/**
+ * Cut [startTime, endTime] (seconds) out of an audio or video file into a mono 16kHz WAV
+ */
+exports.extractClip = (inputPath, outputPath, startTime, endTime) => {
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .setStartTime(startTime)
+      .setDuration(endTime - startTime)
+      .noVideo()
+      .audioChannels(1)
+      .audioFrequency(16000)
+      .format('wav')
+      .output(outputPath)
+      .on('end', () => resolve(outputPath))
+      .on('error', (err) => reject(new Error(`Failed to extract clip from upload: ${err.message}`)))
+      .run();
+  });
+};
+
 exports.formatTimestamp = (seconds) => {
   const m = Math.floor(seconds / 60).toString().padStart(2, '0');
   const s = Math.floor(seconds % 60).toString().padStart(2, '0');
